@@ -45,7 +45,7 @@ def access_to_web(url):
 def scrape_data(page):
     return access_to_web(url_builder(page))
 
-if __name__ == '__main__':
-    result = scrape_data(1)
-    print(result)
-    print(len(result))
+# if __name__ == '__main__':
+#     result = scrape_data(1)
+#     print(result)
+#     print(len(result))

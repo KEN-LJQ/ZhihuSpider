@@ -1,7 +1,7 @@
 from core import DBConnector
 
 # 用户 token 缓存列表大小
-CACHE_LIST_SIZE_MAX = 300
+CACHE_LIST_SIZE_MAX = 500
 
 # 缓存列表保留大小
 CACHE_LIST_SIZE_REMAIN = 100

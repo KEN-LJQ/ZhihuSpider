@@ -134,11 +134,3 @@ def calculate_max_page(total):
 
 def start_scrape():
     core_process()
-
-
-if __name__ == '__main__':
-    # print(generate_user_info_url('excited-vczh'))
-    # print(generate_following_list_url('excited-vczh', 10))
-    # print(generate_follower_list_url('excited-vczh', 10))
-    # print(calculate_max_page(180))
-    start_scrape()
