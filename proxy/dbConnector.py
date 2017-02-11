@@ -12,7 +12,7 @@ PROXY_VALIDATE_TIME = 'validateTime'
 DB_HOST = 'localhost'
 DB_USERNAME = 'root'
 DB_PASSWORD = 'LJQ20110627'
-DB_DATABASE = 'proxy_ip'
+DB_DATABASE = 'proxy_ip_test'
 DB_CHARSET = 'utf8'
 
 # SQL

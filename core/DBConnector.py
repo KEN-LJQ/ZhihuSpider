@@ -1,4 +1,5 @@
 import pymysql
+import threading
 
 # 知乎用户信息字段
 # 用户头像
@@ -42,10 +43,17 @@ DB_DATABASE = 'proxy_ip'
 DB_CHARSET = 'utf8'
 
 # SQL
+# 未分析 token
 INSERT_TOKEN = 'insert ignore into user_list_cache(user_token) values (%s)'
 SELECT_TOKEN = 'select user_token from user_list_cache limit %s'
 DELETE_TOKEN = 'delete from user_list_cache where user_token = %s'
 COUNT_TOKEN = 'select count(*) from user_list_cache'
+# 已分析 token
+INSERT_ANALYSED_TOKEN = 'insert ignore into analysed_user_list_cache(user_token) values (%s)'
+SELECT_ANALYSED_TOKEN = 'select user_token from analysed_user_list_cache limit %s'
+DELETE_ANALYSED_TOKEN = 'delete from analysed_user_list_cache where user_token = %s'
+COUNT_ANALYSED_TOKEN = 'select count(*) from analysed_user_list_cache'
+
 SELECT_USER_INFO_BY_TOKEN = 'select user_avator_url, user_token, user_name, user_headline, user_location, ' \
                             'user_business, user_employments, user_educations, user_description, user_sinaweibo_url, ' \
                             'user_gender, user_following_count, user_follower_count, user_answer_count, ' \
@@ -58,6 +66,8 @@ INSERT_USER_INFO = 'insert into user_info(user_avator_url, user_token, user_name
 
 # 数据库连接
 connection = None
+
+connection_lock = threading.Lock()
 
 
 # 数据库连接初始化
@@ -76,27 +86,31 @@ def connection_close():
         connection.close()
 
 
-# 保存用户 token 到数据库
+# 保存未分析用户 token 到数据库
 def insert_user_token(token_list):
     if connection is None:
         return None
+    connection_lock.acquire()
     cur = connection.cursor()
     for token in token_list:
         cur.execute(INSERT_TOKEN, [token])
     connection.commit()
     cur.close()
+    connection_lock.release()
 
 
 # 从数据库中获取指定数目的 token
 def get_user_token(num):
     if connection is None:
         return None
+    connection_lock.acquire()
     cur = connection.cursor()
     cur.execute(SELECT_TOKEN, [num])
     token_list = []
     for token in cur.fetchall():
         token_list.append(token[0])
     cur.close()
+    connection_lock.release()
     return token_list
 
 
@@ -104,20 +118,77 @@ def get_user_token(num):
 def delete_user_token(token):
     if connection is None:
         return None
+    connection_lock.acquire()
     cur = connection.cursor()
     cur.execute(DELETE_TOKEN, [token])
     connection.commit()
     cur.close()
+    connection_lock.release()
 
 
-# 获得数据库中 token 的数目
+# 获得数据库中未分析 token 的数目
 def get_user_token_num():
     if connection is None:
         return None
+    connection_lock.acquire()
     cur = connection.cursor()
     cur.execute(COUNT_TOKEN)
     data = cur.fetchone()
     cur.close()
+    connection_lock.release()
+    return data[0]
+
+
+# 获取指定数目的已分析 token
+def get_analysed_user_token(num):
+    if connection is None:
+        return None
+    connection_lock.acquire()
+    cur = connection.cursor()
+    cur.execute(SELECT_ANALYSED_TOKEN, [num])
+    token_list = []
+    for token in cur.fetchall():
+        token_list.append(token[0])
+    cur.close()
+    connection_lock.release()
+    return token_list
+
+
+# 从数据库中删除指定 token 的记录
+def delete_analysed_user_token(token):
+    if connection is None:
+        return None
+    connection_lock.acquire()
+    cur = connection.cursor()
+    cur.execute(DELETE_ANALYSED_TOKEN, [token])
+    connection.commit()
+    cur.close()
+    connection_lock.release()
+
+
+# 保存已分析用户 token
+def insert_analysed_user_token(token_list):
+    if connection is None:
+        return None
+    connection_lock.acquire()
+    cur = connection.cursor()
+    for token in token_list:
+        cur.execute(INSERT_ANALYSED_TOKEN, [token])
+    connection.commit()
+    cur.close()
+    connection_lock.release()
+
+
+# 获取数据库中已分析 token 的数目
+def get_analysed_token_num():
+    if connection is None:
+        return None
+    connection_lock.acquire()
+    cur = connection.cursor()
+    cur.execute(COUNT_ANALYSED_TOKEN)
+    data = cur.fetchone()
+    cur.close()
+    connection_lock.release()
     return data[0]
 
 
@@ -125,6 +196,7 @@ def get_user_token_num():
 def select_user_info_by_token(token):
     if connection is None:
         return None
+    connection_lock.acquire()
     cur = connection.cursor()
     cur.execute(SELECT_USER_INFO_BY_TOKEN, [token])
     elem = cur.fetchone()
@@ -147,6 +219,7 @@ def select_user_info_by_token(token):
                 USER_QUESTION_COUNT: elem[14],
                 USER_VOTE_UP_COUNT: elem[15]}
     cur.close()
+    connection_lock.release()
     return data
 
 
@@ -154,6 +227,7 @@ def select_user_info_by_token(token):
 def add_user_info(user_info):
     if connection is None:
         return None
+    connection_lock.acquire()
     cur = connection.cursor()
     cur.execute(INSERT_USER_INFO, [user_info[USER_AVATAR_URL_TEMPLATE],
                                    user_info[USER_URL_TOKEN],
@@ -173,6 +247,7 @@ def add_user_info(user_info):
                                    user_info[USER_VOTE_UP_COUNT]])
     connection.commit()
     cur.close()
+    connection_lock.release()
 
 
 # test_data = ['yi-ya-68-77', 'xiao-xi-ya-17', 'chen-yu-63-80', 'fingerprints', 'hei-hai-27', 'liang-jia-yang',

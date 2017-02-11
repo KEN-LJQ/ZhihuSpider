@@ -44,10 +44,11 @@ def parse_data(data):
 
         proxy_ip_info = {PROXY_IP: ip,
                          PROXY_PORT: port,
-                         PROXY_ADDRESS: address,
-                         PROXY_PROTOCAL: protocol,
-                         PROXY_ALIVE_TIME: alive_time,
-                         PROXY_VALIDATE_TIME: validate_time}
+                         # PROXY_ADDRESS: address,
+                         PROXY_PROTOCAL: protocol
+                         # PROXY_ALIVE_TIME: alive_time,
+                         # PROXY_VALIDATE_TIME: validate_time
+                         }
 
         proxy_ip_list.append(proxy_ip_info)
 
