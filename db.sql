@@ -33,10 +33,16 @@ create table user_info
     user_follower_count int,
     user_answer_count int,
     user_question_count int,
-    user_voteup_count int
+    user_voteup_count int,
+    index(user_token)
 );
 
 create table user_list_cache
+(
+	user_token varchar(50) primary key
+);
+
+create table analysed_user_list_cache
 (
 	user_token varchar(50) primary key
 );

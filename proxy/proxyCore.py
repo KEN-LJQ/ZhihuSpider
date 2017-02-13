@@ -10,12 +10,12 @@ proxy_total = 0
 # 代理网页检索起始页
 start_page = 1
 # 代理网页检索最大截至页
-end_page = 2
+end_page = 3
 # 当前检索页面
 current_page = start_page
 
 # 代理IP缓存列表大小
-PROXY_LIST_SIZE = 2
+PROXY_LIST_SIZE = 5
 # 代理IP缓存列表
 proxy_list = []
 proxy_list_temp = []
@@ -55,7 +55,6 @@ def proxy_scrape_core():
         time.sleep(1)
         if len(current_proxy_list) > 0:
             current_proxy_info = current_proxy_list.pop()
-            # print("正在验证代理：" + current_proxy_info['ip'] + ":" + current_proxy_info['port'])
             # 检查是否存在
             is_exist = is_proxy_exist(current_proxy_info)
             if is_exist is False:

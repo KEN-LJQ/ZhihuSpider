@@ -190,7 +190,11 @@ def parse_user_list(html_string, user_token):
 
     # 提取 json 数据
     bs_object = BeautifulSoup(html_string, 'html.parser')
-    data_string = bs_object.find('div', attrs={'id': 'data'})['data-state']
+    data_string = bs_object.find('div', attrs={'id': 'data'})
+    if data_string is None:
+        return None
+    else:
+        data_string = data_string['data-state']
 
     # 字符串处理
     # 对转义 html 字符进行处理

@@ -2,9 +2,9 @@ from core import DBConnector
 import threading
 
 # 已分析用户信息的用户 token 缓存列表大小
-ANALYSED_CACHE_LIST_SIZE_MAX = 200
+ANALYSED_CACHE_LIST_SIZE_MAX = 3000
 # 已分析用户信息的缓存列表保留大小
-ANALYSED_CACHE_LIST_SIZE_REMAIN = 10
+ANALYSED_CACHE_LIST_SIZE_REMAIN = 100
 # 已分析用户信息的用户 token 缓存列表
 analysed_cache_list = []
 # 已分析用户信息的用户 token 缓存列表信息
@@ -14,9 +14,9 @@ analysed_cache_list_total = 0
 analysed_cache_list_lock = threading.Lock()
 
 # 未分析用户信息的用户 token 缓存列表大小
-CACHE_LIST_SIZE_MAX = 200
+CACHE_LIST_SIZE_MAX = 3000
 # 未分析用户信息的用户 token 缓存列表保留大小
-CACHE_LIST_SIZE_REMAIN = 10
+CACHE_LIST_SIZE_REMAIN = 100
 # 未分析用户信息的用户 token 缓存列表
 cache_list = []
 # 未分析用户信息的用户 token 缓存列表信息
@@ -36,20 +36,16 @@ def cache_list_init():
 
     print('正在配置 token 缓存...')
     # 配置未分析缓存列表
-    cache_list_lock.acquire()
     cache_list_total = DBConnector.get_user_token_num()
     if cache_list_total > 0:
         add_into_list(get_token_from_db(CACHE_LIST_SIZE_REMAIN))
         cache_list_size = len(cache_list)
-    cache_list_lock.release()
 
     # 配置已分析缓存列表
-    analysed_cache_list_lock.acquire()
     analysed_cache_list_total = DBConnector.get_analysed_token_num()
     if analysed_cache_list_total > 0:
         add_into_analysed_list(get_analysed_token_from_db(ANALYSED_CACHE_LIST_SIZE_REMAIN))
         analysed_cache_list_size = len(analysed_cache_list)
-    analysed_cache_list_lock.release()
     print('token 缓存配置成功!!!')
 
 
@@ -71,21 +67,20 @@ def add_into_list(token_list):
         return
 
     # 判断是否需要将一部分的 token 存入数据库
+    # cache_list_lock.acquire()
     if cache_list_size + len(token_list) >= CACHE_LIST_SIZE_MAX:
-        cache_list_lock.acquire()
         temp_list = cache_list[CACHE_LIST_SIZE_REMAIN:]
         cache_list[CACHE_LIST_SIZE_REMAIN:] = []
         cache_list_size = len(cache_list)
-        cache_list_lock.release()
         DBConnector.insert_user_token(temp_list)
 
     # 添加 token
-    cache_list_lock.acquire()
     for token in token_list:
         cache_list.append(token)
+
     cache_list_size += len(token_list)
     cache_list_total += len(token_list)
-    cache_list_lock.release()
+    # cache_list_lock.release()
 
 
 # 添加 token 到已分析列表中
@@ -98,23 +93,21 @@ def add_into_analysed_list(token_list):
         return
 
     # 判断是否需要将一部分的已分析 token 保存到数据库中
+    # analysed_cache_list_lock.acquire()
     if analysed_cache_list_size + len(token_list) >= ANALYSED_CACHE_LIST_SIZE_MAX:
-        analysed_cache_list_lock.acquire()
         temp_list = analysed_cache_list[ANALYSED_CACHE_LIST_SIZE_REMAIN:]
         analysed_cache_list[ANALYSED_CACHE_LIST_SIZE_REMAIN:] = []
         analysed_cache_list_size = len(analysed_cache_list)
-        analysed_cache_list_lock.release()
         DBConnector.insert_analysed_user_token(temp_list)
 
     # 添加 token
-    analysed_cache_list_lock.acquire()
     for token in token_list:
         analysed_cache_list.append(token)
 
     # 更新已分析缓存列表信息
     analysed_cache_list_size += len(token_list)
     analysed_cache_list_total += len(token_list)
-    analysed_cache_list_lock.release()
+    # analysed_cache_list_lock.release()
 
 
 # 从未分析列表中取出一个 token
@@ -123,7 +116,7 @@ def get_from_list():
     global cache_list_size
     global cache_list_total
 
-    cache_list_lock.acquire()
+    # cache_list_lock.acquire()
     token = None
     if cache_list_size > 0:
         cache_list_size -= 1
@@ -137,7 +130,7 @@ def get_from_list():
             cache_list_size -= 1
             cache_list_total -= 1
             token = cache_list.pop()
-    cache_list_lock.release()
+    # cache_list_lock.release()
     return token
 
 
@@ -147,7 +140,7 @@ def get_from_analysed_list():
     global analysed_cache_list_size
     global analysed_cache_list_total
 
-    analysed_cache_list_lock.acquire()
+    # analysed_cache_list_lock.acquire()
     token = None
     if analysed_cache_list_size > 0:
         analysed_cache_list_size -= 1
@@ -160,7 +153,7 @@ def get_from_analysed_list():
             analysed_cache_list_size -= 1
             analysed_cache_list_total -= 1
             token = analysed_cache_list.pop()
-    analysed_cache_list_lock.release()
+    # analysed_cache_list_lock.release()
     return token
 
 
