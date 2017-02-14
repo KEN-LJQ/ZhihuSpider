@@ -1,160 +1,41 @@
 from core import DBConnector
-import threading
+# import threading
+import queue
 
+
+# 使用 Queue 实现
 # 已分析用户信息的用户 token 缓存列表大小
-ANALYSED_CACHE_LIST_SIZE_MAX = 3000
+MAX_ANALYSED_CACHE_QUEUE_SIZE = 1000
 # 已分析用户信息的缓存列表保留大小
-ANALYSED_CACHE_LIST_SIZE_REMAIN = 100
+MIN_ANALYSED_CACHE_QUEUE_SIZE = 20
 # 已分析用户信息的用户 token 缓存列表
-analysed_cache_list = []
-# 已分析用户信息的用户 token 缓存列表信息
-analysed_cache_list_size = 0
-analysed_cache_list_total = 0
-# 已分析用户信息的用户缓存列表读写锁
-analysed_cache_list_lock = threading.Lock()
+analysed_cache_queue = queue.Queue(MAX_ANALYSED_CACHE_QUEUE_SIZE)
 
 # 未分析用户信息的用户 token 缓存列表大小
-CACHE_LIST_SIZE_MAX = 3000
+MAX_CACHE_QUEUE_SIZE = 1000
 # 未分析用户信息的用户 token 缓存列表保留大小
-CACHE_LIST_SIZE_REMAIN = 100
+MIN_CACHE_QUEUE_SIZE = 20
 # 未分析用户信息的用户 token 缓存列表
-cache_list = []
-# 未分析用户信息的用户 token 缓存列表信息
-cache_list_size = 0
-cache_list_total = 0
-cache_list_lock = threading.Lock()
+cache_queue = queue.Queue(MAX_CACHE_QUEUE_SIZE)
 
 
-# 缓存列表初始化
-def cache_list_init():
-    global cache_list_total
-    global cache_list
-    global cache_list_size
-    global analysed_cache_list_total
-    global analysed_cache_list
-    global analysed_cache_list_size
+# 初始化队列
+def init_queue():
+    print('正在配置用户 Token 缓存列表...')
+    # 配置未分析用户信息列表
+    token_total = DBConnector.get_user_token_num()
+    if token_total > 0:
+        temp_list = get_token_from_db(MIN_CACHE_QUEUE_SIZE)
+        for token in temp_list:
+            cache_queue.put(token)
 
-    print('正在配置 token 缓存...')
-    # 配置未分析缓存列表
-    cache_list_total = DBConnector.get_user_token_num()
-    if cache_list_total > 0:
-        add_into_list(get_token_from_db(CACHE_LIST_SIZE_REMAIN))
-        cache_list_size = len(cache_list)
-
-    # 配置已分析缓存列表
-    analysed_cache_list_total = DBConnector.get_analysed_token_num()
-    if analysed_cache_list_total > 0:
-        add_into_analysed_list(get_analysed_token_from_db(ANALYSED_CACHE_LIST_SIZE_REMAIN))
-        analysed_cache_list_size = len(analysed_cache_list)
-    print('token 缓存配置成功!!!')
-
-
-# 缓存列表关闭
-def cache_list_close():
-    if cache_list_size > 0:
-        DBConnector.insert_user_token(cache_list)
-    if analysed_cache_list_size > 0:
-        DBConnector.insert_analysed_user_token(analysed_cache_list)
-
-
-# 添加 token 到未分析列表中
-def add_into_list(token_list):
-    global cache_list
-    global cache_list_size
-    global cache_list_total
-
-    if token_list is None:
-        return
-
-    # 判断是否需要将一部分的 token 存入数据库
-    # cache_list_lock.acquire()
-    if cache_list_size + len(token_list) >= CACHE_LIST_SIZE_MAX:
-        temp_list = cache_list[CACHE_LIST_SIZE_REMAIN:]
-        cache_list[CACHE_LIST_SIZE_REMAIN:] = []
-        cache_list_size = len(cache_list)
-        DBConnector.insert_user_token(temp_list)
-
-    # 添加 token
-    for token in token_list:
-        cache_list.append(token)
-
-    cache_list_size += len(token_list)
-    cache_list_total += len(token_list)
-    # cache_list_lock.release()
-
-
-# 添加 token 到已分析列表中
-def add_into_analysed_list(token_list):
-    global analysed_cache_list
-    global analysed_cache_list_size
-    global analysed_cache_list_total
-
-    if token_list is None:
-        return
-
-    # 判断是否需要将一部分的已分析 token 保存到数据库中
-    # analysed_cache_list_lock.acquire()
-    if analysed_cache_list_size + len(token_list) >= ANALYSED_CACHE_LIST_SIZE_MAX:
-        temp_list = analysed_cache_list[ANALYSED_CACHE_LIST_SIZE_REMAIN:]
-        analysed_cache_list[ANALYSED_CACHE_LIST_SIZE_REMAIN:] = []
-        analysed_cache_list_size = len(analysed_cache_list)
-        DBConnector.insert_analysed_user_token(temp_list)
-
-    # 添加 token
-    for token in token_list:
-        analysed_cache_list.append(token)
-
-    # 更新已分析缓存列表信息
-    analysed_cache_list_size += len(token_list)
-    analysed_cache_list_total += len(token_list)
-    # analysed_cache_list_lock.release()
-
-
-# 从未分析列表中取出一个 token
-def get_from_list():
-    global cache_list
-    global cache_list_size
-    global cache_list_total
-
-    # cache_list_lock.acquire()
-    token = None
-    if cache_list_size > 0:
-        cache_list_size -= 1
-        cache_list_total -= 1
-        token = cache_list.pop()
-    else:
-        # 尝试从数据库中取出 token
-        if DBConnector.get_user_token_num() > 0:
-            add_into_list(get_token_from_db(CACHE_LIST_SIZE_REMAIN))
-
-            cache_list_size -= 1
-            cache_list_total -= 1
-            token = cache_list.pop()
-    # cache_list_lock.release()
-    return token
-
-
-# 从已分析列表中取出一个token
-def get_from_analysed_list():
-    global analysed_cache_list
-    global analysed_cache_list_size
-    global analysed_cache_list_total
-
-    # analysed_cache_list_lock.acquire()
-    token = None
-    if analysed_cache_list_size > 0:
-        analysed_cache_list_size -= 1
-        analysed_cache_list_total -= 1
-        token = analysed_cache_list.pop()
-    else:
-        # 尝试从数据库中取出
-        if DBConnector.get_analysed_token_num() > 0:
-            add_into_analysed_list(get_analysed_token_from_db(ANALYSED_CACHE_LIST_SIZE_REMAIN))
-            analysed_cache_list_size -= 1
-            analysed_cache_list_total -= 1
-            token = analysed_cache_list.pop()
-    # analysed_cache_list_lock.release()
-    return token
+    # 配置已分析用户信息列表
+    token_total = DBConnector.get_analysed_token_num()
+    if token_total > 0:
+        temp_list = get_analysed_token_from_db(MIN_ANALYSED_CACHE_QUEUE_SIZE)
+        for token in temp_list:
+            analysed_cache_queue.put(token)
+    print('用户 Token 健存列表配置完毕!!!')
 
 
 # 从数据库未分析列表取出指定数目的 token
@@ -173,11 +54,59 @@ def get_analysed_token_from_db(num):
     return token_list
 
 
-# 获取剩余未分析的 token 数目
-def get_token_number():
-    return cache_list_total
+# 添加 Token 到 cache_queue 中
+def add_token_into_cache_queue(token_list):
+    # 判断队列中是否有足够位置存放，否则将一部分放入内存
+    if cache_queue.qsize() + len(token_list) >= MAX_CACHE_QUEUE_SIZE:
+        temp_list = []
+        while cache_queue.qsize() > MIN_CACHE_QUEUE_SIZE:
+            temp_list.append(cache_queue.get())
+        DBConnector.insert_user_token(temp_list)
+
+    # 将该 Token 加入到队列中
+    for token in token_list:
+        cache_queue.put(token)
 
 
-# 获取剩余已分析的 token 数目
-def get_analysed_token_number():
-    return analysed_cache_list
+# 添加 Token 到 analysed_cache_queue 中
+def add_token_into_analysed_cache_queue(token_list):
+    # 判断队列中是否有足够位置存放，否则将一部分放入内存
+    if analysed_cache_queue.qsize() + len(token_list) >= MAX_ANALYSED_CACHE_QUEUE_SIZE:
+        temp_list = []
+        while analysed_cache_queue.qsize() > MIN_ANALYSED_CACHE_QUEUE_SIZE:
+            temp_list.append(analysed_cache_queue.get())
+        DBConnector.insert_analysed_user_token(temp_list)
+
+    # 将该 Token 加入到队列中
+    for token in token_list:
+        analysed_cache_queue.put(token)
+
+
+# 从 cache_queue 中取出一个 Token
+def get_token_from_cache_queue():
+    if cache_queue.qsize() > 0:
+        # 直从队列中取出
+        return cache_queue.get()
+    elif DBConnector.get_user_token_num() > 0:
+        # 队列为空，先从数据库中取出一部分数据
+        temp_list = get_token_from_db(MIN_CACHE_QUEUE_SIZE)
+        for token in temp_list:
+            cache_queue.put(token)
+        return cache_queue.get()
+    else:
+        return None
+
+
+# 从analysed_cache_queue 中取出一个 Token
+def get_token_form_analysed_cache_queue():
+    if analysed_cache_queue.qsize() > 0:
+        # 直接从队列中取出
+        return analysed_cache_queue.get()
+    elif DBConnector.get_analysed_token_num() > 0:
+        # 队列为空，先从数据库中取出一部分数据
+        temp_list = get_analysed_token_from_db(MIN_ANALYSED_CACHE_QUEUE_SIZE)
+        for token in temp_list:
+            analysed_cache_queue.put(token)
+        return analysed_cache_queue.get()
+    else:
+        return None

@@ -248,17 +248,3 @@ def add_user_info(user_info):
     connection.commit()
     cur.close()
     connection_lock.release()
-
-
-# test_data = ['yi-ya-68-77', 'xiao-xi-ya-17', 'chen-yu-63-80', 'fingerprints', 'hei-hai-27', 'liang-jia-yang',
-#              'ran-xin-lin-23-27', 'twocold-27-52', 'nana-72-99', 'ling-bo-li-41', 'qi-hai-tao-57', 'xiao-gou-87',
-#              'MyWorseHalf', 'elapse08', 'lizhenyi95', 'zhang-kai-rui-86', 'wuchangyexue', 'listening-43',
-#              'hou-yu-wen-92', 'wang-xiao-yin-25-6']
-# if __name__ == '__main__':
-#     connection_init()
-#     delete_user_token('new-jay')
-#     # insert_user_token(test_data)
-#     # print(get_user_token_num())
-#     # print(get_user_token(3))
-#     print(select_user_info_by_token('excited-vczh'))
-#     connection_close()

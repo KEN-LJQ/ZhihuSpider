@@ -1,6 +1,10 @@
 from bs4 import BeautifulSoup
+from core import DBConnector
+from core import UserList
 import html
 import json
+import queue
+import threading
 
 # 知乎用户信息字段
 # 用户头像
@@ -39,6 +43,96 @@ USER_VOTE_UP_COUNT = 'voteupCount'
 # JSON 数据关键字
 JSON_ENTITIES = 'entities'
 JSON_USERS = 'users'
+
+# 队列中数据字典的键值
+QUEUE_ELEM_HTML = 'html'
+QUEUE_ELEM_TOKEN = 'token'
+QUEUE_ELEM_THREAD_NAME = 'thread_name'
+
+
+# 用户信息数据待解析缓存队列
+USER_INFO_CACHE_QUEUE_SIZE = 300
+user_info_cache_queue = queue.Queue(USER_INFO_CACHE_QUEUE_SIZE)
+
+# 用户列表数据待解析缓存队列
+USER_LIST_CACHE_QUEUE_SIZE = 300
+user_list_cache_queue = queue.Queue(USER_LIST_CACHE_QUEUE_SIZE)
+
+
+# 用户信息数据解析线程
+class UserInfoDataParserThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        print('用户信息数据解析线程启动!!!')
+        while True:
+            raw_data = None
+            token = None
+            thread_name = None
+
+            data = get_data_from_user_info_cache_queue()
+
+            if QUEUE_ELEM_HTML in data:
+                raw_data = data[QUEUE_ELEM_HTML]
+            if QUEUE_ELEM_TOKEN in data:
+                token = data[QUEUE_ELEM_TOKEN]
+            if QUEUE_ELEM_THREAD_NAME in data:
+                thread_name = data[QUEUE_ELEM_THREAD_NAME]
+
+            if raw_data is not None and token is not None:
+                user_info = parse_user_information(raw_data, token)
+                if user_info is not None:
+                    print('[' + thread_name + "]搜索到一个用户:" + user_info['name'])
+                    DBConnector.add_user_info(convert_user_info(user_info))
+                    UserList.add_token_into_analysed_cache_queue([token])
+
+
+# 用户列表数据分析线程
+class UserListDataParserThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        print('用户列表数据分析线程启动!!!')
+        while True:
+            raw_data = None
+            token = None
+            thread_name = None
+
+            data = get_data_from_user_list_cache_queue()
+            if QUEUE_ELEM_HTML in data:
+                raw_data = data[QUEUE_ELEM_HTML]
+            if QUEUE_ELEM_TOKEN in data:
+                token = data[QUEUE_ELEM_TOKEN]
+            if QUEUE_ELEM_THREAD_NAME in data:
+                thread_name = data[QUEUE_ELEM_THREAD_NAME]
+
+            if raw_data is not None and token is not None:
+                token_list = parse_user_list(raw_data, token)
+                if token_list is not None:
+                    print('[' + thread_name + ']开始分析用户“' + token + '”的关注列表')
+                    UserList.add_token_into_cache_queue(token_list)
+
+
+# 添加一条待解析数据到 user_info_cache_queue 中
+def add_data_into_user_info_cache_queue(data):
+    user_info_cache_queue.put(data)
+
+
+# 添加一条待解析数据到 user_list_cache_queue 中
+def add_data_into_user_list_cache_queue(data):
+    user_list_cache_queue.put(data)
+
+
+# 从 user_info_cache_queue 中获取一条数据
+def get_data_from_user_info_cache_queue():
+    return user_info_cache_queue.get()
+
+
+# 从 user_list_cache_queue 中获取一条数据
+def get_data_from_user_list_cache_queue():
+    return user_list_cache_queue.get()
 
 
 # 解析 html 中的知乎用户信息
@@ -245,23 +339,3 @@ def convert_user_info(user_info):
     user_info[USER_EDUCATIONS] = educations_string
 
     return user_info
-
-# requestHeader = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-#                  "Accept-Encoding": "gzip, deflate, sdch, br",
-#                  "Accept-Language": "zh-CN,zh;q=0.8",
-#                  "Cache-Control": "max-age=0",
-#                  "Host": "www.zhihu.com",
-#                  "Upgrade-Insecure-Requests": "1",
-#                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36"}
-#
-# if __name__ == '__main__':
-#     session = requests.session()
-#     session.headers = requestHeader
-#     response = session.get('https://www.zhihu.com/people/excited-vczh/following?page=2')
-    # print(parse_user_information(response.text, 'excited-vczh'))
-    # print(parse_user_list(response.text, 'excited-vczh'))
-    # print(convert_user_info(parse_user_information(response.text, 'excited-vczh')))
-    # DBConnector.connection_init()
-    # print(convert_user_info(parse_user_information(response.text, 'excited-vczh')))
-    # DBConnector.add_user_info(convert_user_info(parse_user_information(response.text, 'excited-vczh')))
-    # DBConnector.connection_init()

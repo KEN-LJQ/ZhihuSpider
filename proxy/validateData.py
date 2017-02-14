@@ -1,7 +1,7 @@
-from proxy import dbConnector
 import requests
 import re
 
+# 代理信息字段
 PROXY_IP = 'ip'
 PROXY_PORT = 'port'
 PROXY_ADDRESS = 'address'
@@ -54,22 +54,3 @@ def validate_proxy_ip(proxy_ip_info):
         # print('连接错误\n')
         # print(str(e))
         return False
-
-
-def is_exist(proxy_info):
-    query_result = dbConnector.select_ip_port(proxy_info)
-    if query_result is not None:
-        return False
-    else:
-        return True
-
-# if __name__ == '__main__':
-#     ip_info = {'protocal': 'HTTP', 'ip': '222.209.184.198', 'aliveTime': '61天', 'address': '广东东莞',
-#                'validateTime': '17-01-31 06:45', 'port': '8118'}
-#     print(validate_proxy_ip(ip_info))
-    # str1 = '222.209.184.198 ip'
-    # str2 = '222.209.184.198'
-    # ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}', str1)
-    # print(ip[0])
-    # if ip[0] == str2:
-    #     print('equal')
