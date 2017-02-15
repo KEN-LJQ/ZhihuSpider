@@ -2,19 +2,6 @@ create database proxy_ip;
 
 use proxy_ip;
 
-create table ip_list
-(
-	id int auto_increment primary key,
-    proxy_ip varchar(20) not null,
-    proxy_port varchar(10) not null,
-    proxy_address varchar(20),
-    proxy_protocal varchar(10) not null,
-    proxy_alive_time varchar(20),
-    proxy_validate_time varchar(20)
-);
-
-use proxy_ip;
-
 create table user_info
 (
 	id int auto_increment primary key,
