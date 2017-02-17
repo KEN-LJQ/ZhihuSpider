@@ -7,14 +7,14 @@ import queue
 # 已分析用户信息的用户 token 缓存列表大小
 MAX_ANALYSED_CACHE_QUEUE_SIZE = 1000
 # 已分析用户信息的缓存列表保留大小
-MIN_ANALYSED_CACHE_QUEUE_SIZE = 20
+MIN_ANALYSED_CACHE_QUEUE_SIZE = 1
 # 已分析用户信息的用户 token 缓存列表
 analysed_cache_queue = queue.Queue(MAX_ANALYSED_CACHE_QUEUE_SIZE)
 
 # 未分析用户信息的用户 token 缓存列表大小
 MAX_CACHE_QUEUE_SIZE = 1000
 # 未分析用户信息的用户 token 缓存列表保留大小
-MIN_CACHE_QUEUE_SIZE = 20
+MIN_CACHE_QUEUE_SIZE = 1
 # 未分析用户信息的用户 token 缓存列表
 cache_queue = queue.Queue(MAX_CACHE_QUEUE_SIZE)
 
@@ -35,7 +35,7 @@ def init_queue():
         temp_list = get_analysed_token_from_db(MIN_ANALYSED_CACHE_QUEUE_SIZE)
         for token in temp_list:
             analysed_cache_queue.put(token)
-    print('用户 Token 健存列表配置完毕!!!')
+    print('用户 Token 缓存列表配置完毕!!!')
 
 
 # 从数据库未分析列表取出指定数目的 token

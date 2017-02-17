@@ -27,37 +27,46 @@ session_count_list = {}
 # 读写锁
 thread_lock = threading.Lock()
 
+# 是否启用代理
+is_proxy_enable = True
+
 # 代理服务守护线程
 proxy_daemon = proxyCore.ProxyScraperDaemon()
 
 
 # 初始化基本网络配置
-def init_network():
+def init_network(proxy_setting):
     print('正在初始化网络配置...')
+    global is_proxy_enable
+    is_proxy_enable = proxy_setting
 
     # 启动代理守护线程
-    proxy_daemon.start()
+    if is_proxy_enable is True:
+        proxy_daemon.start()
 
     print('网络配置完毕')
 
 
 # 为数据爬取线程绑定连接 session
 def thread_bind_session(thread_name):
-    # 获取可用的代理
-    while True:
-        proxy_info = proxyCore.get_proxy()
-        if proxy_info is not None:
-            break
-        time.sleep(5)
-
     # 配置 session
-    ip = proxy_info['ip']
-    port = proxy_info['port']
-    protocal = proxy_info['protocal'].lower()
-    proxy = {protocal: ip + ':' + port}
     session = requests.session()
     session.headers = requestHeader
-    session.proxies = proxy
+
+    # 配置 session 的代理
+    if is_proxy_enable is True:
+        # 获取可用的代理
+        while True:
+            proxy_info = proxyCore.get_proxy()
+            if proxy_info is not None:
+                break
+            time.sleep(5)
+
+        ip = proxy_info['ip']
+        port = proxy_info['port']
+        protocal = proxy_info['protocal'].lower()
+        proxy = {protocal: ip + ':' + port}
+        session.proxies = proxy
 
     # 绑定该 session
     thread_lock.acquire()
@@ -124,10 +133,11 @@ def fetch_data_of_url(url, thread_name):
 
     # 连接到指定的 URL
     retry_time = 0
-    while retry_time <= NETWORK_RETRY_TIME:
+    while retry_time < NETWORK_RETRY_TIME:
         # 若代理使用次数过多则更换
-        if session_count >= PROXY_REQUEST_MAX:
-            switch_proxy(thread_name)
+        if is_proxy_enable is True:
+            if session_count >= PROXY_REQUEST_MAX:
+                switch_proxy(thread_name)
 
         # 尝试连接
         try:
@@ -145,4 +155,9 @@ def fetch_data_of_url(url, thread_name):
             # 重试
             retry_time += 1
             print('[' + str(thread_name) + ']' + '网络异常，正在重新连接...（第' + str(retry_time) + '次重试)')
+
+    # 若达到最大的重试次数则更换代理并返回 None
+    if is_proxy_enable is True:
+        switch_proxy(thread_name)
+
     return None

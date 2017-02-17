@@ -23,6 +23,9 @@ USER_INFO_SCRAPE_THREAD_NUM = 8
 # 用户列表抓取线程数量
 USER_LIST_SCRAPE_THREAD_NUM = 8
 
+# 是否使用代理
+IS_PROXY_ENABLE = True
+
 # 爬虫起始 token
 start_token = None
 
@@ -68,10 +71,12 @@ def user_info_scrape(thread_name):
         # 抓取 token 对应用户的个人信息，并保存
         response = DataFetch.fetch_data_of_url(generate_user_info_url(token), thread_name)
 
-        # 添加到待分析队列
-        DataParser.add_data_into_user_info_cache_queue({DataParser.QUEUE_ELEM_HTML: response.text,
-                                                        DataParser.QUEUE_ELEM_TOKEN: token,
-                                                        DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
+        # 判断返回的数据是否有效，若有效再继续对数据进行分析
+        if response is not None:
+            # 添加到待分析队列
+            DataParser.add_data_into_user_info_cache_queue({DataParser.QUEUE_ELEM_HTML: response.text,
+                                                            DataParser.QUEUE_ELEM_TOKEN: token,
+                                                            DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
 
         # 爬取时间间隔
         time.sleep(SCRAPE_TIME_INTERVAL)
@@ -124,12 +129,15 @@ def user_list_scrape(thread_name):
                 following_list_response = DataFetch.fetch_data_of_url(
                     generate_following_list_url(token, cur_page), thread_name)
 
-                # 添加到分析队列
-                DataParser.add_data_into_user_list_cache_queue({
-                    DataParser.QUEUE_ELEM_HTML: following_list_response.text,
-                    DataParser.QUEUE_ELEM_TOKEN: token,
-                    DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
-                cur_page += 1
+                # 判断返回的数据是否有效，若有效再对数据进行分析
+                if following_list_response is not None:
+                    # 添加到分析队列
+                    DataParser.add_data_into_user_list_cache_queue({
+                        DataParser.QUEUE_ELEM_HTML: following_list_response.text,
+                        DataParser.QUEUE_ELEM_TOKEN: token,
+                        DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
+                    cur_page += 1
+
                 time.sleep(SCRAPE_TIME_INTERVAL)
 
         # 分析关注者列表
@@ -148,11 +156,14 @@ def user_list_scrape(thread_name):
                 follower_list_response = DataFetch.fetch_data_of_url(
                     generate_follower_list_url(token, cur_page), thread_name)
 
-                # 添加到待分析队列
-                DataParser.add_data_into_user_list_cache_queue({DataParser.QUEUE_ELEM_HTML: follower_list_response.text,
-                                                                DataParser.QUEUE_ELEM_TOKEN: token,
-                                                                DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
-                cur_page += 1
+                # 判断返回的数据是否有效，若有效再继续对数据进行分析
+                if follower_list_response is not None:
+                    # 添加到待分析队列
+                    DataParser.add_data_into_user_list_cache_queue({
+                        DataParser.QUEUE_ELEM_HTML: follower_list_response.text,
+                        DataParser.QUEUE_ELEM_TOKEN: token,
+                        DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
+                    cur_page += 1
                 time.sleep(SCRAPE_TIME_INTERVAL)
 
 
@@ -199,7 +210,7 @@ def calculate_max_page(total):
 def start_scrape():
     # 初始化
     DBConnector.connection_init()
-    DataFetch.init_network()
+    DataFetch.init_network(IS_PROXY_ENABLE)
     UserList.init_queue()
 
     # 放入爬虫起始 token

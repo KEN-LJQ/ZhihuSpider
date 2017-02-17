@@ -13,6 +13,7 @@ def parse_data(data):
     # data 要求非空
     if data is None:
         return
+
     html = BeautifulSoup(data, "html.parser")
     proxy_ip_list = []
 
@@ -30,17 +31,17 @@ def parse_data(data):
         port_node = ip_node.find_next_sibling()
         address_node = port_node.find_next_sibling()
         protocal_node = address_node.find_next_sibling().find_next_sibling()
-        alive_time_node = protocal_node.find_next_sibling().find_next_sibling().find_next_sibling()
-        validate_time_node = alive_time_node.find_next_sibling()
+        # alive_time_node = protocal_node.find_next_sibling().find_next_sibling().find_next_sibling()
+        # validate_time_node = alive_time_node.find_next_sibling()
         ip = ip_node.string
         port = port_node.string
-        if address_node.find('a') is not None:
-            address = address_node.find('a').string
-        else:
-            address = 'none'
+        # if address_node.find('a') is not None:
+        #     address = address_node.find('a').string
+        # else:
+        #     address = 'none'
         protocol = protocal_node.string
-        alive_time = alive_time_node.string
-        validate_time = validate_time_node.string
+        # alive_time = alive_time_node.string
+        # validate_time = validate_time_node.string
 
         proxy_ip_info = {PROXY_IP: ip,
                          PROXY_PORT: port,

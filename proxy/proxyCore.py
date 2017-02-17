@@ -33,7 +33,7 @@ PROXY_ALIVE_TIME = 'aliveTime'
 PROXY_VALIDATE_TIME = 'validateTime'
 
 
-# 启动代理IP爬虫
+# 代理IP爬虫
 def proxy_scrape_core():
     global current_page
     global proxy_total
@@ -78,7 +78,7 @@ class ProxyScraperDaemon(threading.Thread):
         threading.Thread.__init__(self)
 
     def run(self):
-        print('启动代理服务守护线程')
+        print('代理IP服务守护线程启动')
         start_proxy_scrape()
 
 
