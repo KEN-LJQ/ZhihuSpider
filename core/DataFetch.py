@@ -80,13 +80,15 @@ def switch_proxy(thread_name):
     print('[' + str(thread_name) + ']' + '正在更换代理')
 
     # 获取绑定的session
-    # session = None
     if thread_name in session_bind_list:
         thread_lock.acquire()
         session = session_bind_list[thread_name]
         thread_lock.release()
     else:
-        print('[' + str(thread_name) + ']' + '代理更换失败')
+        # print('[' + str(thread_name) + ']' + '代理更换失败')
+        # return
+        # 重新绑定代理
+        thread_bind_session(thread_name)
         return
 
     # 获取可用的 proxy
@@ -107,6 +109,7 @@ def switch_proxy(thread_name):
     thread_lock.acquire()
     session_bind_list.update({thread_name: session})
     session_count_list.update({thread_name: 0})
+    count = session_count_list[thread_name]
     thread_lock.release()
 
     print('[' + str(thread_name) + ']' + '代理更换成功')
@@ -129,7 +132,6 @@ def fetch_data_of_url(url, thread_name):
 
     if session is None or session_count is None:
         thread_bind_session(thread_name)
-        return None
 
     # 连接到指定的 URL
     retry_time = 0
@@ -138,6 +140,7 @@ def fetch_data_of_url(url, thread_name):
         if is_proxy_enable is True:
             if session_count >= PROXY_REQUEST_MAX:
                 switch_proxy(thread_name)
+                session_count = 0
 
         # 尝试连接
         try:

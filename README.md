@@ -109,17 +109,17 @@
 
 8. 程序开始运行
 
-   运行截图：
+   * 运行截图：
 
-![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A86.png)
+     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A86.png)
 
-​	运行截图：
+   * 运行截图：
 
-![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A88.png)
+     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A88.png)
 
-​	运行结果
+   * 运行结果
 
-![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E7%88%AC%E5%8F%96%E5%86%85%E5%AE%B9%E4%BB%8B%E7%BB%8D2.png)
+     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E7%88%AC%E5%8F%96%E5%86%85%E5%AE%B9%E4%BB%8B%E7%BB%8D2.png)
 
 
 

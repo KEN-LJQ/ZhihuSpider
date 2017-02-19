@@ -63,56 +63,64 @@ user_list_cache_queue = queue.Queue(USER_LIST_CACHE_QUEUE_SIZE)
 class UserInfoDataParserThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
+        self.status = 'running'
 
     def run(self):
         print('用户信息数据解析线程启动!!!')
-        while True:
-            raw_data = None
-            token = None
-            thread_name = None
+        try:
+            while True:
+                raw_data = None
+                token = None
+                thread_name = None
 
-            data = get_data_from_user_info_cache_queue()
+                data = get_data_from_user_info_cache_queue()
 
-            if QUEUE_ELEM_HTML in data:
-                raw_data = data[QUEUE_ELEM_HTML]
-            if QUEUE_ELEM_TOKEN in data:
-                token = data[QUEUE_ELEM_TOKEN]
-            if QUEUE_ELEM_THREAD_NAME in data:
-                thread_name = data[QUEUE_ELEM_THREAD_NAME]
+                if QUEUE_ELEM_HTML in data:
+                    raw_data = data[QUEUE_ELEM_HTML]
+                if QUEUE_ELEM_TOKEN in data:
+                    token = data[QUEUE_ELEM_TOKEN]
+                if QUEUE_ELEM_THREAD_NAME in data:
+                    thread_name = data[QUEUE_ELEM_THREAD_NAME]
 
-            if raw_data is not None and token is not None:
-                user_info = parse_user_information(raw_data, token)
-                if user_info is not None:
-                    print('[' + thread_name + "]搜索到一个用户:" + user_info['name'])
-                    DBConnector.add_user_info(convert_user_info(user_info))
-                    UserList.add_token_into_analysed_cache_queue([token])
+                if raw_data is not None and token is not None:
+                    user_info = parse_user_information(raw_data, token)
+                    if user_info is not None:
+                        print('[' + thread_name + "]搜索到一个用户:" + user_info['name'])
+                        DBConnector.add_user_info(convert_user_info(user_info))
+                        UserList.add_token_into_analysed_cache_queue([token])
+        except:
+            self.status = 'error'
 
 
 # 用户列表数据分析线程
 class UserListDataParserThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
+        self.status = 'running'
 
     def run(self):
         print('用户列表数据分析线程启动!!!')
-        while True:
-            raw_data = None
-            token = None
-            thread_name = None
+        try:
+            while True:
+                raw_data = None
+                token = None
+                thread_name = None
 
-            data = get_data_from_user_list_cache_queue()
-            if QUEUE_ELEM_HTML in data:
-                raw_data = data[QUEUE_ELEM_HTML]
-            if QUEUE_ELEM_TOKEN in data:
-                token = data[QUEUE_ELEM_TOKEN]
-            if QUEUE_ELEM_THREAD_NAME in data:
-                thread_name = data[QUEUE_ELEM_THREAD_NAME]
+                data = get_data_from_user_list_cache_queue()
+                if QUEUE_ELEM_HTML in data:
+                    raw_data = data[QUEUE_ELEM_HTML]
+                if QUEUE_ELEM_TOKEN in data:
+                    token = data[QUEUE_ELEM_TOKEN]
+                if QUEUE_ELEM_THREAD_NAME in data:
+                    thread_name = data[QUEUE_ELEM_THREAD_NAME]
 
-            if raw_data is not None and token is not None:
-                token_list = parse_user_list(raw_data, token)
-                if token_list is not None:
-                    print('[' + thread_name + ']开始分析用户“' + token + '”的关注列表')
-                    UserList.add_token_into_cache_queue(token_list)
+                if raw_data is not None and token is not None:
+                    token_list = parse_user_list(raw_data, token)
+                    if token_list is not None:
+                        print('[' + thread_name + ']开始分析用户“' + token + '”的关注列表')
+                        UserList.add_token_into_cache_queue(token_list)
+        except:
+            self.status = 'error'
 
 
 # 添加一条待解析数据到 user_info_cache_queue 中

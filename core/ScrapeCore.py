@@ -2,6 +2,7 @@ import core.DBConnector as DBConnector
 import core.DataFetch as DataFetch
 import core.DataParser as DataParser
 import core.UserList as UserList
+import proxy.proxyCore as proxyCore
 import time
 import threading
 
@@ -10,18 +11,18 @@ PAGE_SIZE = 20
 # 爬虫动作时间间隔（单位：秒）
 SCRAPE_TIME_INTERVAL = 1
 # 正在关注页面时最大爬取页面范围
-FOLLOWING_PAGE_MAX = 150
+FOLLOWING_PAGE_MAX = 200
 # 关注着页面最大爬取页面范围
-FOLLOWER_PAGE_MAX = 150
+FOLLOWER_PAGE_MAX = 200
 # 是否分析正在关注列表
 ANALYSE_FOLLOWING_LIST = True
 # 是否分析关注者列表
-ANALYSE_FOLLOWER_LIST = False
+ANALYSE_FOLLOWER_LIST = True
 
 # 用户信息抓取线程数量
-USER_INFO_SCRAPE_THREAD_NUM = 8
+USER_INFO_SCRAPE_THREAD_NUM = 5
 # 用户列表抓取线程数量
-USER_LIST_SCRAPE_THREAD_NUM = 8
+USER_LIST_SCRAPE_THREAD_NUM = 15
 
 # 是否使用代理
 IS_PROXY_ENABLE = True
@@ -35,9 +36,13 @@ class UserInfoScrapeThread(threading.Thread):
     def __init__(self, thread_name):
         threading.Thread.__init__(self)
         self.thread_name = thread_name
+        self.status = 'running'
 
     def run(self):
-        user_info_scrape(self.thread_name)
+        try:
+            user_info_scrape(self.thread_name)
+        except:
+            self.status = 'error'
 
 
 # 用户关注列表分析线程
@@ -45,9 +50,13 @@ class UserListScrapeThread(threading.Thread):
     def __init__(self, thread_name):
         threading.Thread.__init__(self)
         self.thread_name = thread_name
+        self.status = 'running'
 
     def run(self):
-        user_list_scrape(self.thread_name)
+        try:
+            user_list_scrape(self.thread_name)
+        except:
+            self.status = 'error'
 
 
 # 爬取用户信息
@@ -217,20 +226,68 @@ def start_scrape():
     if start_token is not None:
         UserList.add_token_into_cache_queue([start_token])
 
-    # 启动线程
+    # 启动数据解析线程
     user_info_parser_thread = DataParser.UserInfoDataParserThread()
     user_list_parser_thread = DataParser.UserListDataParserThread()
     user_info_parser_thread.start()
     user_list_parser_thread.start()
 
+    # 用户信息爬取线程列表
+    user_info_scrape_thread_list = []
+    # 创建并启动用户信息爬取线程
     thread_count = 1
     while thread_count <= USER_INFO_SCRAPE_THREAD_NUM:
         user_info_scrape_thread = UserInfoScrapeThread('user-info-scrape-thread' + str(thread_count))
+        user_info_scrape_thread_list.append(user_info_scrape_thread)
         user_info_scrape_thread.start()
         thread_count += 1
 
+    # 用户列表爬取线程列表
+    user_list_scrape_thread_list = []
+    # 创建并启动用户列表爬取线程
     thread_count = 1
     while thread_count <= USER_LIST_SCRAPE_THREAD_NUM:
         user_list_scrape_thread = UserListScrapeThread('user-list-scrape-thread' + str(thread_count))
+        user_list_scrape_thread_list.append(user_list_scrape_thread)
         user_list_scrape_thread.start()
         thread_count += 1
+
+    # 检测线程是否出现异常停止，并重新启动
+    while True:
+        # 检测用户信息解析线程
+        if user_info_parser_thread.status == 'error':
+            user_info_parser_thread = DataParser.UserInfoDataParserThread()
+            user_info_parser_thread.start()
+
+        # 检测用户列表解析线程
+        if user_list_parser_thread.status == 'error':
+            user_list_parser_thread = DataParser.UserListDataParserThread()
+            user_list_parser_thread.start()
+
+        if IS_PROXY_ENABLE is True:
+            if DataFetch.proxy_daemon.status == 'error':
+                DataFetch.proxy_daemon = proxyCore.ProxyScraperDaemon()
+                DataFetch.proxy_daemon.start()
+
+        # 检测用户信息爬取线程
+        for thread in user_info_scrape_thread_list:
+            if thread.status == 'error':
+                thread_name = thread.thread_name
+                user_info_scrape_thread_list.remove(thread)
+                new_thread = UserInfoScrapeThread(thread_name)
+                user_info_scrape_thread_list.append(new_thread)
+                print('[' + thread_name + ']重新启动线程')
+                new_thread.start()
+
+        # 检测用户列表爬取线程
+        for thread in user_list_scrape_thread_list:
+            if thread.status == 'error':
+                thread_name = thread.thread_name
+                user_list_scrape_thread_list.remove(thread)
+                new_thread = UserListScrapeThread(thread_name)
+                user_list_scrape_thread_list.append(new_thread)
+                print('[' + thread_name + ']重新启动线程')
+                new_thread.start()
+
+        # 检测间隔
+        time.sleep(180)

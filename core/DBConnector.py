@@ -38,7 +38,7 @@ USER_VOTE_UP_COUNT = 'voteupCount'
 # 数据库配置
 DB_HOST = 'localhost'
 DB_USERNAME = 'root'
-DB_PASSWORD = 'LJQ20110627'
+DB_PASSWORD = 'XXX'
 DB_DATABASE = 'proxy_ip_test'
 DB_CHARSET = 'utf8'
 

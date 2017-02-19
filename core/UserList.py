@@ -7,14 +7,14 @@ import queue
 # 已分析用户信息的用户 token 缓存列表大小
 MAX_ANALYSED_CACHE_QUEUE_SIZE = 1000
 # 已分析用户信息的缓存列表保留大小
-MIN_ANALYSED_CACHE_QUEUE_SIZE = 1
+MIN_ANALYSED_CACHE_QUEUE_SIZE = 100
 # 已分析用户信息的用户 token 缓存列表
 analysed_cache_queue = queue.Queue(MAX_ANALYSED_CACHE_QUEUE_SIZE)
 
 # 未分析用户信息的用户 token 缓存列表大小
 MAX_CACHE_QUEUE_SIZE = 1000
 # 未分析用户信息的用户 token 缓存列表保留大小
-MIN_CACHE_QUEUE_SIZE = 1
+MIN_CACHE_QUEUE_SIZE = 100
 # 未分析用户信息的用户 token 缓存列表
 cache_queue = queue.Queue(MAX_CACHE_QUEUE_SIZE)
 

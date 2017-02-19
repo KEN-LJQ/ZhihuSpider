@@ -76,10 +76,14 @@ def proxy_scrape_core():
 class ProxyScraperDaemon(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
+        self.status = 'running'
 
     def run(self):
         print('代理IP服务守护线程启动')
-        start_proxy_scrape()
+        try:
+            start_proxy_scrape()
+        except:
+            self.status = 'error'
 
 
 # 启动代理爬虫
