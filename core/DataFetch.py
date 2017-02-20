@@ -14,9 +14,11 @@ requestHeader = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.
                                " Chrome/56.0.2924.87 Safari/537.36"}
 
 # 当个代理最大请求次数
-PROXY_REQUEST_MAX = 20000
-# 发生网络错误时重新连接次数
-NETWORK_RETRY_TIME = 3
+PROXY_REQUEST_MAX = 5000
+# 发生网络异常重试次数
+NETWORK_ERROR_RETRY_TIME = 3
+# 发生响应异常重试次数
+RESPONSE_ERROR_RETRY_TIME = 10
 # 网络连接超时（单位：秒）
 NETWORK_TIMEOUT = 30
 
@@ -109,7 +111,6 @@ def switch_proxy(thread_name):
     thread_lock.acquire()
     session_bind_list.update({thread_name: session})
     session_count_list.update({thread_name: 0})
-    count = session_count_list[thread_name]
     thread_lock.release()
 
     print('[' + str(thread_name) + ']' + '代理更换成功')
@@ -134,33 +135,49 @@ def fetch_data_of_url(url, thread_name):
         thread_bind_session(thread_name)
 
     # 连接到指定的 URL
-    retry_time = 0
-    while retry_time < NETWORK_RETRY_TIME:
+    network_error_retry_time = 0
+    response_error_retry_time = 0
+    while network_error_retry_time < NETWORK_ERROR_RETRY_TIME and response_error_retry_time < RESPONSE_ERROR_RETRY_TIME:
         # 若代理使用次数过多则更换
         if is_proxy_enable is True:
             if session_count >= PROXY_REQUEST_MAX:
                 switch_proxy(thread_name)
                 session_count = 0
+                network_error_retry_time = 0
+                response_error_retry_time = 0
 
         # 尝试连接
         try:
+            # 获取 URL 对应的数据
             response = session.get(url, timeout=NETWORK_TIMEOUT)
-            session_count += 1
-            thread_lock.acquire()
-            session_count_list.update({thread_name: session_count})
-            thread_lock.release()
-            return response
-        except requests.exceptions.RequestException:
-            # 重试
-            retry_time += 1
-            print('[' + str(thread_name) + ']' + '网络异常，正在重新连接...(第' + str(retry_time) + '次重试)')
-        except Exception:
-            # 重试
-            retry_time += 1
-            print('[' + str(thread_name) + ']' + '网络异常，正在重新连接...（第' + str(retry_time) + '次重试)')
 
-    # 若达到最大的重试次数则更换代理并返回 None
+            # 判断是否获得了正确的响应
+            if response.status_code == 200:
+                session_count += 1
+                thread_lock.acquire()
+                session_count_list.update({thread_name: session_count})
+                thread_lock.release()
+                return response
+            elif response.status_code == 429:
+                print('[' + str(thread_name) + ']' + '访问太频繁， 响应码为：' + str(response.status_code))
+                response_error_retry_time += 1
+                time.sleep(40)
+            elif response.status_code == 404 or response.status_code == 410:
+                return None
+            elif is_proxy_enable is True:
+                # 代理可能已被屏蔽, 重试
+                print('[' + str(thread_name) + ']' + '接收到不正确响应， 响应码为：' + str(response.status_code))
+                response_error_retry_time += 1
+                continue
+
+        except Exception:
+            # 网络异常重试
+            network_error_retry_time += 1
+            print('[' + str(thread_name) + ']' + '网络异常，正在重新连接...（第' + str(network_error_retry_time) + '次重试)')
+
+    # 若达到最大的重试次数则更换代理
     if is_proxy_enable is True:
         switch_proxy(thread_name)
 
-    return None
+    # 要求调用方将该 token 重用
+    return 'reuse'

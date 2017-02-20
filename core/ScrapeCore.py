@@ -9,20 +9,20 @@ import threading
 # 默认关注与被关注列表每页的大小
 PAGE_SIZE = 20
 # 爬虫动作时间间隔（单位：秒）
-SCRAPE_TIME_INTERVAL = 1
-# 正在关注页面时最大爬取页面范围
+SCRAPE_TIME_INTERVAL = 2
+# 正在关注页面时最大爬取页面范围(若为负数则代表不作限制)
 FOLLOWING_PAGE_MAX = 200
-# 关注着页面最大爬取页面范围
-FOLLOWER_PAGE_MAX = 200
+# 关注着页面最大爬取页面范围(若为负数则代表不作限制)
+FOLLOWER_PAGE_MAX = 100
 # 是否分析正在关注列表
 ANALYSE_FOLLOWING_LIST = True
 # 是否分析关注者列表
 ANALYSE_FOLLOWER_LIST = True
 
 # 用户信息抓取线程数量
-USER_INFO_SCRAPE_THREAD_NUM = 5
+USER_INFO_SCRAPE_THREAD_NUM = 8
 # 用户列表抓取线程数量
-USER_LIST_SCRAPE_THREAD_NUM = 15
+USER_LIST_SCRAPE_THREAD_NUM = 13
 
 # 是否使用代理
 IS_PROXY_ENABLE = True
@@ -82,10 +82,14 @@ def user_info_scrape(thread_name):
 
         # 判断返回的数据是否有效，若有效再继续对数据进行分析
         if response is not None:
-            # 添加到待分析队列
-            DataParser.add_data_into_user_info_cache_queue({DataParser.QUEUE_ELEM_HTML: response.text,
-                                                            DataParser.QUEUE_ELEM_TOKEN: token,
-                                                            DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
+            if response == 'reuse':
+                # 将该 token 放回队列
+                UserList.add_token_into_cache_queue([token])
+            else:
+                # 添加到待分析队列
+                DataParser.add_data_into_user_info_cache_queue({DataParser.QUEUE_ELEM_HTML: response.text,
+                                                                DataParser.QUEUE_ELEM_TOKEN: token,
+                                                                DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
 
         # 爬取时间间隔
         time.sleep(SCRAPE_TIME_INTERVAL)
@@ -128,7 +132,7 @@ def user_list_scrape(thread_name):
             following_page_size = 1
             if DataParser.USER_FOLLOWING_COUNT in user_info:
                 following_page_size = calculate_max_page(user_info[DataParser.USER_FOLLOWING_COUNT])
-            if following_page_size > FOLLOWING_PAGE_MAX:
+            if 0 < FOLLOWING_PAGE_MAX < following_page_size:
                 following_page_size = FOLLOWING_PAGE_MAX
 
             # 开始分析
@@ -155,7 +159,7 @@ def user_list_scrape(thread_name):
             follower_page_size = 1
             if DataParser.USER_FOLLOWER_COUNT in user_info:
                 follower_page_size = calculate_max_page(user_info[DataParser.USER_FOLLOWER_COUNT])
-            if follower_page_size > FOLLOWER_PAGE_MAX:
+            if follower_page_size > FOLLOWER_PAGE_MAX > 0:
                 follower_page_size = FOLLOWER_PAGE_MAX
 
             # 开始分析

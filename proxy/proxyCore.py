@@ -10,12 +10,12 @@ proxy_total = 0
 # 代理网页检索起始页
 start_page = 1
 # 代理网页检索最大截至页
-end_page = 3
+end_page = 2
 # 当前检索页面
 current_page = start_page
 
 # 代理IP缓存列表大小
-PROXY_LIST_SIZE = 5
+PROXY_LIST_SIZE = 10
 # 代理IP缓存列表
 proxy_list = []
 proxy_list_temp = []
