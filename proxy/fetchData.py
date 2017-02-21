@@ -1,4 +1,5 @@
 import requests
+import time
 
 # 请求网页的 UEL
 requestUrl = "http://www.xicidaili.com/nn/"
@@ -8,44 +9,37 @@ requestHeader = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.
                  "Accept-Encoding": "gzip, deflate, sdch",
                  "Accept-Language": "zh-CN,zh;q=0.8",
                  "Host": "www.xicidaili.com",
-                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36"}
+                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 "
+                               "(KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36"}
 
-# 当前连接的一些信息
+# 连接重试次数
+NETWORK_RETRY_TIME = 3
+# 连接重试间隔(单位：秒)
+NETWORK_RETRY_INTERVAL = 30
+
+# 当前连接
 session = requests.session()
-cookies = None
 
 
-# 构造 URL
-def url_builder(page):
-    return requestUrl + str(page)
-
-
-# 连接到指定的 URL 并获得返回的内容
-def access_to_web(url):
-    global cookies
-    # setting request info
+# 获取代理信息
+def fetch_proxy_data(page):
+    # 设置连接信息
     session.headers = requestHeader
-    if cookies is not None:
-        session.cookies = cookies
 
-    # fetch data
-    try:
-        response = session.get(url)
-    except Exception:
-        # handler exception
-        print("fail to connect to [" + url + "]")
-        return None
-    else:
-        # update cookies
-        cookies = response.cookies
-        return response.text
+    # 构造请求 URL
+    url = requestUrl + str(page)
 
+    # 获取数据
+    retry_time = 0
+    while retry_time < NETWORK_RETRY_TIME:
+        try:
+            response = session.get(url)
+            return response.text
+        except Exception:
+            # 网络异常
+            print("[代理模块]网络异常，代理信息获取失败")
+            retry_time += 1
+    time.sleep(NETWORK_RETRY_INTERVAL)
 
-# 获取代理 IP 信息
-def scrape_data(page):
-    return access_to_web(url_builder(page))
-
-# if __name__ == '__main__':
-#     result = scrape_data(1)
-#     print(result)
-#     print(len(result))
+    # 超过重试次数返回 None
+    return None

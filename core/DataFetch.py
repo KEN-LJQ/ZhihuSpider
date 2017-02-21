@@ -14,7 +14,7 @@ requestHeader = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.
                                " Chrome/56.0.2924.87 Safari/537.36"}
 
 # 当个代理最大请求次数
-PROXY_REQUEST_MAX = 5000
+PROXY_REQUEST_MAX = 10000
 # 发生网络异常重试次数
 NETWORK_ERROR_RETRY_TIME = 3
 # 发生响应异常重试次数
@@ -32,9 +32,6 @@ thread_lock = threading.Lock()
 # 是否启用代理
 is_proxy_enable = True
 
-# 代理服务守护线程
-proxy_daemon = proxyCore.ProxyScraperDaemon()
-
 
 # 初始化基本网络配置
 def init_network(proxy_setting):
@@ -44,7 +41,7 @@ def init_network(proxy_setting):
 
     # 启动代理守护线程
     if is_proxy_enable is True:
-        proxy_daemon.start()
+        proxyCore.start_proxy_core()
 
     print('网络配置完毕')
 
@@ -87,8 +84,6 @@ def switch_proxy(thread_name):
         session = session_bind_list[thread_name]
         thread_lock.release()
     else:
-        # print('[' + str(thread_name) + ']' + '代理更换失败')
-        # return
         # 重新绑定代理
         thread_bind_session(thread_name)
         return
@@ -159,7 +154,7 @@ def fetch_data_of_url(url, thread_name):
                 thread_lock.release()
                 return response
             elif response.status_code == 429:
-                print('[' + str(thread_name) + ']' + '访问太频繁， 响应码为：' + str(response.status_code))
+                print('[' + str(thread_name) + ']' + '访问太频繁，稍候重新访问，响应码为：' + str(response.status_code))
                 response_error_retry_time += 1
                 time.sleep(40)
             elif response.status_code == 404 or response.status_code == 410:

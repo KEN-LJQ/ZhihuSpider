@@ -1,12 +1,12 @@
-create database proxy_ip;
+create database zhihu_spider;
 
-use proxy_ip;
+use zhihu_spider;
 
 create table user_info
 (
 	id int auto_increment primary key,
     user_avator_url varchar(50),
-    user_token varchar(50) not null,
+    user_token varchar(50) unique not null,
     user_name varchar(30) not null,
     user_headline varchar(100),
     user_location varchar(100),

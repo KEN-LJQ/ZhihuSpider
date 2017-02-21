@@ -3,26 +3,7 @@ from proxy import fetchData
 from proxy import parseData
 import time
 import threading
-
-# 当前存在的代理IP总数
-proxy_total = 0
-
-# 代理网页检索起始页
-start_page = 1
-# 代理网页检索最大截至页
-end_page = 2
-# 当前检索页面
-current_page = start_page
-
-# 代理IP缓存列表大小
-PROXY_LIST_SIZE = 10
-# 代理IP缓存列表
-proxy_list = []
-proxy_list_temp = []
-# 缓存列表同步锁
-proxy_list_lock = threading.Lock()
-# 缓存列表扫描更新间隔
-PROXY_LIST_SCAN_INTERVAL = 60
+import queue
 
 PROXY_ID = 'id'
 PROXY_IP = 'ip'
@@ -32,112 +13,112 @@ PROXY_PROTOCAL = 'protocal'
 PROXY_ALIVE_TIME = 'aliveTime'
 PROXY_VALIDATE_TIME = 'validateTime'
 
+# 代理网页检索起始页
+FETCH_START_PAGE = 1
+# 代理网页检索最大截至页
+FETCH_END_PAGE = 5
 
-# 代理IP爬虫
-def proxy_scrape_core():
-    global current_page
-    global proxy_total
+# 代理池大小
+PROXY_POOL_SIZE = 10
+# 缓存列表扫描更新间隔
+PROXY_LIST_SCAN_INTERVAL = 300
+# 代理验证线程数
+VALIDATE_THREAD_NUM = 3
 
-    # 设置检索页面
-    if current_page > end_page:
-        current_page = start_page
+# 待验证的代理信息列表
+unchecked_proxy_list = queue.LifoQueue(300)
+# 可用的代理池
+proxy_pool = queue.Queue(100)
 
-    # 开始检索新的代理IP
-    current_proxy_list = []
-    while proxy_total < PROXY_LIST_SIZE:
-        # 当前待验证列表中无代理IP时，再次检索
-        if len(current_proxy_list) <= 0:
-            # print("开始检索代理IP，当前检索页面：" + str(current_page) + "\n")
-            current_proxy_list = parseData.parse_data(fetchData.scrape_data(current_page))
-            current_page += 1
-
-        # 对当前列表中的代理进行验证
-        time.sleep(1)
-        if len(current_proxy_list) > 0:
-            current_proxy_info = current_proxy_list.pop()
-            # 检查是否存在
-            is_exist = is_proxy_exist(current_proxy_info)
-            if is_exist is False:
-                # 检查是否存活
-                is_available = validateData.validate_proxy_ip(current_proxy_info)
-                if is_available is True:
-                    proxy_list_lock.acquire()
-                    proxy_list.append(current_proxy_info)
-                    proxy_total += 1
-                    proxy_list_lock.release()
-                    # print('验证成功，代理IP有效，并保存到数据库\n')
-                # else:
-                #     print('验证失败，代理IP无效\n')
-            # else:
-            #     print("验证失败，代理IP已经存在\n")
+# 标志量，是否正在扫描代理池
+is_scanning = False
 
 
-# 代理爬虫守护线程
-class ProxyScraperDaemon(threading.Thread):
+# 启动代理服务
+def start_proxy_core():
+    # 启动代理检验线程
+    validate_thread_list = []
+    for i in range(VALIDATE_THREAD_NUM):
+        validate_thread = ProxyValidateThread()
+        validate_thread_list.append(validate_thread)
+        validate_thread.start()
+
+    # 启动代理池扫描线程
+    scan_thread = ProxyPoolScanThread()
+    scan_thread.start()
+
+
+# 代理检验线程
+class ProxyValidateThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
-        self.status = 'running'
 
     def run(self):
-        print('代理IP服务守护线程启动')
-        try:
-            start_proxy_scrape()
-        except:
-            self.status = 'error'
+        # print('代理验证线程启动')
+        while True:
+            # 若正在扫描代理池，则暂停
+            while is_scanning:
+                time.sleep(3)
+
+            if proxy_pool.qsize() < PROXY_POOL_SIZE and unchecked_proxy_list.qsize() > 0:
+                unchecked_proxy = unchecked_proxy_list.get()
+                is_available = validateData.validate_proxy_ip(unchecked_proxy)
+                if is_available is True:
+                    proxy_pool.put(unchecked_proxy)
+                    # print(unchecked_proxy)
+                time.sleep(1)
+            else:
+                time.sleep(5)
 
 
-# 启动代理爬虫
-def start_proxy_scrape():
-    # 初始化
-    global proxy_total
-    global proxy_list
-    global proxy_list_temp
-    proxy_total = 0
+# 代理池扫描线程，去除代理池中不可用的代理
+class ProxyPoolScanThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
 
-    # 运行进程
-    while True:
-        # 对缓存列表中的代理进行存活性检查
-        # print('开始存活检查')
-        proxy_list_lock.acquire()
-        for proxy in proxy_list:
-            is_alive = validateData.validate_proxy_ip(proxy)
-            if is_alive is True:
-                proxy_list_temp.append(proxy)
-        proxy_list = proxy_list_temp
-        proxy_total = len(proxy_list)
-        proxy_list_temp = []
-        proxy_list_lock.release()
-
-        # 判断是否需要获取新的代理
-        if len(proxy_list) < PROXY_LIST_SIZE:
-            # print('需要获取新代理')
-            proxy_scrape_core()
-
-        print('更新代理缓存列表成功')
-        # 线程睡眠
-        time.sleep(PROXY_LIST_SCAN_INTERVAL)
+    def run(self):
+        # print('代理池扫描线程启动')
+        while True:
+            if proxy_pool.qsize() < PROXY_POOL_SIZE and unchecked_proxy_list.qsize() < PROXY_POOL_SIZE:
+                fetch_and_parse_proxy()
+            elif proxy_pool.qsize() == PROXY_POOL_SIZE:
+                # print('更新代理池')
+                scan_proxy_pool()
+                time.sleep(PROXY_LIST_SCAN_INTERVAL)
+            else:
+                time.sleep(60)
 
 
-# 判断指定的代理是否已经存在
-def is_proxy_exist(proxy):
-    if proxy is None:
-        return True
+# 扫描代理池中的代理
+def scan_proxy_pool():
+    # 由于待验证线程是先进后出队列，故对代理池进行扫描只需要将其添加到未检查列表，
+    # 由代理检验线程对其重新验证并加入回代理池
 
-    if proxy in proxy_list:
-        return True
-    else:
-        return False
+    global is_scanning
+    is_scanning = True
+    while proxy_pool.qsize() > 0:
+        unchecked_proxy_list.put(proxy_pool.get())
+    is_scanning = False
 
 
-# 返回一条代理信息,若无则返回空
+current_page = 1
+
+
+# 爬取并解析代理
+def fetch_and_parse_proxy():
+    global current_page
+    if current_page > FETCH_END_PAGE:
+        current_page = FETCH_START_PAGE
+
+    response_data = fetchData.fetch_proxy_data(current_page)
+    proxy_data = parseData.parse_data(response_data)
+    current_page += 1
+
+    # 将解析到的代理添加到待验证的代理列表
+    for proxy in proxy_data:
+        unchecked_proxy_list.put(proxy)
+
+
+# 从代理池中获取一个代理
 def get_proxy():
-    global proxy_total
-    global proxy_list
-
-    proxy = None
-    proxy_list_lock.acquire()
-    if len(proxy_list) > 0:
-        proxy = proxy_list.pop()
-        proxy_total -= 1
-    proxy_list_lock.release()
-    return proxy
+    return proxy_pool.get()

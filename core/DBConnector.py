@@ -38,8 +38,8 @@ USER_VOTE_UP_COUNT = 'voteupCount'
 # 数据库配置
 DB_HOST = 'localhost'
 DB_USERNAME = 'root'
-DB_PASSWORD = 'XXX'
-DB_DATABASE = 'proxy_ip_test'
+DB_PASSWORD = 'LJQ20110627'
+DB_DATABASE = 'zhihu_spider'
 DB_CHARSET = 'utf8'
 
 # SQL
@@ -58,9 +58,9 @@ SELECT_USER_INFO_BY_TOKEN = 'select user_avator_url, user_token, user_name, user
                             'user_business, user_employments, user_educations, user_description, user_sinaweibo_url, ' \
                             'user_gender, user_following_count, user_follower_count, user_answer_count, ' \
                             'user_question_count, user_voteup_count from user_info where user_token = %s'
-INSERT_USER_INFO = 'insert into user_info(user_avator_url, user_token, user_name, user_headline, user_location, ' \
-                   'user_business, user_employments, user_educations, user_description, user_sinaweibo_url, ' \
-                   'user_gender, user_following_count, user_follower_count, user_answer_count, ' \
+INSERT_USER_INFO = 'insert ignore into user_info(user_avator_url, user_token, user_name, user_headline, ' \
+                   'user_location, user_business, user_employments, user_educations, user_description, ' \
+                   'user_sinaweibo_url, user_gender, user_following_count, user_follower_count, user_answer_count, ' \
                    'user_question_count, user_voteup_count) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,' \
                    '%s,%s,%s,%s,%s,%s,%s)'
 

@@ -14,6 +14,8 @@ url = 'http://icanhazip.com/'
 
 # 连接超时设置（单位：秒）
 timeout = 30
+# 连接重试次数
+network_retry_time = 3
 
 # 请求头信息
 header = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -40,17 +42,20 @@ def validate_proxy_ip(proxy_ip_info):
     session = requests.session()
     session.headers = header
     session.proxies = proxy
-    try:
-        response = session.get(url, timeout=timeout)
+    retry_time = 0
+    while retry_time < network_retry_time:
+        try:
+            response = session.get(url, timeout=timeout)
 
-        # 解析返回的当前使用的IP并判断是否有效
-        match_list = re.findall(r'[0-9]+(?:\.[0-9]+){3}', response.text)
-        if len(match_list) > 0:
-            current_ip = match_list.pop()
-            if current_ip is not None and current_ip == proxy_ip:
-                return True
-        return False
-    except requests.exceptions.RequestException as e:
-        # print('连接错误\n')
-        # print(str(e))
-        return False
+            # 解析返回的当前使用的IP并判断是否有效
+            match_list = re.findall(r'[0-9]+(?:\.[0-9]+){3}', response.text)
+            if len(match_list) > 0:
+                current_ip = match_list.pop()
+                if current_ip is not None and current_ip == proxy_ip:
+                    return True
+            else:
+                retry_time += 1
+        except Exception:
+            retry_time += 1
+
+    return False

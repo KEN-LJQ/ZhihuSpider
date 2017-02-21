@@ -88,7 +88,8 @@ class UserInfoDataParserThread(threading.Thread):
                         print('[' + thread_name + "]搜索到一个用户:" + user_info['name'])
                         DBConnector.add_user_info(convert_user_info(user_info))
                         UserList.add_token_into_analysed_cache_queue([token])
-        except:
+        except Exception as e:
+            print(e)
             self.status = 'error'
 
 
@@ -119,7 +120,8 @@ class UserListDataParserThread(threading.Thread):
                     if token_list is not None:
                         print('[' + thread_name + ']开始分析用户“' + token + '”的关注列表')
                         UserList.add_token_into_cache_queue(token_list)
-        except:
+        except Exception as e:
+            print(e)
             self.status = 'error'
 
 

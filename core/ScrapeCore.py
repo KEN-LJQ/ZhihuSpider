@@ -2,7 +2,6 @@ import core.DBConnector as DBConnector
 import core.DataFetch as DataFetch
 import core.DataParser as DataParser
 import core.UserList as UserList
-import proxy.proxyCore as proxyCore
 import time
 import threading
 
@@ -22,7 +21,7 @@ ANALYSE_FOLLOWER_LIST = True
 # 用户信息抓取线程数量
 USER_INFO_SCRAPE_THREAD_NUM = 8
 # 用户列表抓取线程数量
-USER_LIST_SCRAPE_THREAD_NUM = 13
+USER_LIST_SCRAPE_THREAD_NUM = 8
 
 # 是否使用代理
 IS_PROXY_ENABLE = True
@@ -41,7 +40,8 @@ class UserInfoScrapeThread(threading.Thread):
     def run(self):
         try:
             user_info_scrape(self.thread_name)
-        except:
+        except Exception as e:
+            print(e)
             self.status = 'error'
 
 
@@ -55,7 +55,8 @@ class UserListScrapeThread(threading.Thread):
     def run(self):
         try:
             user_list_scrape(self.thread_name)
-        except:
+        except Exception as e:
+            print(e)
             self.status = 'error'
 
 
@@ -117,7 +118,6 @@ def user_list_scrape(thread_name):
         while retry > 0:
             user_info = DBConnector.select_user_info_by_token(token)
             if user_info is None:
-                # print('is None')
                 retry -= 1
                 time.sleep(1)
             else:
@@ -189,6 +189,7 @@ def is_token_available(token):
         return True
 
 
+# URL 组件
 URL_PUBLIC = 'https://www.zhihu.com/people/'
 URL_ANSWER = '/answers'
 URL_FOLLOWING = '/following'
@@ -239,22 +240,18 @@ def start_scrape():
     # 用户信息爬取线程列表
     user_info_scrape_thread_list = []
     # 创建并启动用户信息爬取线程
-    thread_count = 1
-    while thread_count <= USER_INFO_SCRAPE_THREAD_NUM:
+    for thread_count in range(USER_INFO_SCRAPE_THREAD_NUM):
         user_info_scrape_thread = UserInfoScrapeThread('user-info-scrape-thread' + str(thread_count))
         user_info_scrape_thread_list.append(user_info_scrape_thread)
         user_info_scrape_thread.start()
-        thread_count += 1
 
     # 用户列表爬取线程列表
     user_list_scrape_thread_list = []
     # 创建并启动用户列表爬取线程
-    thread_count = 1
-    while thread_count <= USER_LIST_SCRAPE_THREAD_NUM:
+    for thread_count in range(USER_LIST_SCRAPE_THREAD_NUM):
         user_list_scrape_thread = UserListScrapeThread('user-list-scrape-thread' + str(thread_count))
         user_list_scrape_thread_list.append(user_list_scrape_thread)
         user_list_scrape_thread.start()
-        thread_count += 1
 
     # 检测线程是否出现异常停止，并重新启动
     while True:
@@ -267,11 +264,6 @@ def start_scrape():
         if user_list_parser_thread.status == 'error':
             user_list_parser_thread = DataParser.UserListDataParserThread()
             user_list_parser_thread.start()
-
-        if IS_PROXY_ENABLE is True:
-            if DataFetch.proxy_daemon.status == 'error':
-                DataFetch.proxy_daemon = proxyCore.ProxyScraperDaemon()
-                DataFetch.proxy_daemon.start()
 
         # 检测用户信息爬取线程
         for thread in user_info_scrape_thread_list:
