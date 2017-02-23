@@ -34,59 +34,108 @@ proxy_pool = queue.Queue(100)
 is_scanning = False
 
 
-# 启动代理服务
-def start_proxy_core():
-    # 启动代理检验线程
-    validate_thread_list = []
-    for i in range(VALIDATE_THREAD_NUM):
-        validate_thread = ProxyValidateThread()
-        validate_thread_list.append(validate_thread)
-        validate_thread.start()
+# # 启动代理服务
+# def start_proxy_core():
+#     # 启动代理检验线程
+#     validate_thread_list = []
+#     for i in range(VALIDATE_THREAD_NUM):
+#         validate_thread = ProxyValidateThread()
+#         validate_thread_list.append(validate_thread)
+#         validate_thread.start()
+#
+#     # 启动代理池扫描线程
+#     scan_thread = ProxyPoolScanThread()
+#     scan_thread.start()
 
-    # 启动代理池扫描线程
-    scan_thread = ProxyPoolScanThread()
-    scan_thread.start()
+
+# 代理服务守护线程
+class ProDaemonThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        # 启动代理检验线程
+        validate_thread_list = []
+        for i in range(VALIDATE_THREAD_NUM):
+            validate_thread = ProxyValidateThread()
+            validate_thread_list.append(validate_thread)
+            validate_thread.start()
+
+        # 启动代理池扫描线程
+        scan_thread = ProxyPoolScanThread()
+        scan_thread.start()
+
+        # 检查是否有线程出现异常并将其重启
+        while True:
+            # 检查代理验证线程
+            for thread in validate_thread_list:
+                if thread.status == 'error':
+                    validate_thread_list.remove(thread)
+                    thread = ProxyValidateThread()
+                    validate_thread_list.append(thread)
+                    thread.start()
+                    print('[info]代理验证线程重新启动')
+
+            # 检查代理池扫描线程
+            if scan_thread.status == 'error':
+                scan_thread = ProxyPoolScanThread()
+                scan_thread.start()
+                print('[info]代理池扫描线程重新启动')
+
+            time.sleep(180)
 
 
 # 代理检验线程
 class ProxyValidateThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
+        self.status = 'running'
 
     def run(self):
-        # print('代理验证线程启动')
-        while True:
-            # 若正在扫描代理池，则暂停
-            while is_scanning:
-                time.sleep(3)
+        try:
+            # print('代理验证线程启动')
+            while True:
+                # 若正在扫描代理池，则暂停
+                while is_scanning:
+                    time.sleep(3)
 
-            if proxy_pool.qsize() < PROXY_POOL_SIZE and unchecked_proxy_list.qsize() > 0:
-                unchecked_proxy = unchecked_proxy_list.get()
-                is_available = validateData.validate_proxy_ip(unchecked_proxy)
-                if is_available is True:
-                    proxy_pool.put(unchecked_proxy)
-                    # print(unchecked_proxy)
-                time.sleep(1)
-            else:
-                time.sleep(5)
+                if proxy_pool.qsize() < PROXY_POOL_SIZE and unchecked_proxy_list.qsize() > 0:
+                    unchecked_proxy = unchecked_proxy_list.get()
+                    is_available = validateData.validate_proxy_ip(unchecked_proxy)
+                    if is_available is True:
+                        proxy_pool.put(unchecked_proxy)
+                        # print(unchecked_proxy)
+                    time.sleep(1)
+                else:
+                    time.sleep(5)
+        except Exception as e:
+            print('[error]代理验证线程抛出了一个异常：')
+            print(e)
+            self.status = 'error'
 
 
 # 代理池扫描线程，去除代理池中不可用的代理
 class ProxyPoolScanThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
+        self.status = 'running'
 
     def run(self):
-        # print('代理池扫描线程启动')
-        while True:
-            if proxy_pool.qsize() < PROXY_POOL_SIZE and unchecked_proxy_list.qsize() < PROXY_POOL_SIZE:
-                fetch_and_parse_proxy()
-            elif proxy_pool.qsize() == PROXY_POOL_SIZE:
-                # print('更新代理池')
-                scan_proxy_pool()
-                time.sleep(PROXY_LIST_SCAN_INTERVAL)
-            else:
-                time.sleep(60)
+        try:
+            # print('代理池扫描线程启动')
+            while True:
+                if proxy_pool.qsize() < PROXY_POOL_SIZE and unchecked_proxy_list.qsize() < PROXY_POOL_SIZE:
+                    fetch_and_parse_proxy()
+                elif proxy_pool.qsize() == PROXY_POOL_SIZE:
+                    # print('更新代理池')
+                    scan_proxy_pool()
+                    time.sleep(PROXY_LIST_SCAN_INTERVAL)
+                else:
+                    time.sleep(60)
+        except Exception as e:
+            print('[error]代理池扫描线程抛出了一个异常：')
+            print(e)
+            self.status = 'error'
 
 
 # 扫描代理池中的代理

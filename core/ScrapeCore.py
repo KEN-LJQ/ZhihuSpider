@@ -41,6 +41,7 @@ class UserInfoScrapeThread(threading.Thread):
         try:
             user_info_scrape(self.thread_name)
         except Exception as e:
+            print('[error]an Exception occur on ' + str(self.thread_name) + ':')
             print(e)
             self.status = 'error'
 
@@ -56,6 +57,7 @@ class UserListScrapeThread(threading.Thread):
         try:
             user_list_scrape(self.thread_name)
         except Exception as e:
+            print('[error]an Exception occur on ' + str(self.thread_name) + ':')
             print(e)
             self.status = 'error'
 
@@ -144,12 +146,16 @@ def user_list_scrape(thread_name):
 
                 # 判断返回的数据是否有效，若有效再对数据进行分析
                 if following_list_response is not None:
-                    # 添加到分析队列
-                    DataParser.add_data_into_user_list_cache_queue({
-                        DataParser.QUEUE_ELEM_HTML: following_list_response.text,
-                        DataParser.QUEUE_ELEM_TOKEN: token,
-                        DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
-                    cur_page += 1
+                    if following_list_response == 'reuse':
+                        # 重新分析该页的列表
+                        continue
+                    else:
+                        # 添加到分析队列
+                        DataParser.add_data_into_user_list_cache_queue({
+                            DataParser.QUEUE_ELEM_HTML: following_list_response.text,
+                            DataParser.QUEUE_ELEM_TOKEN: token,
+                            DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
+                        cur_page += 1
 
                 time.sleep(SCRAPE_TIME_INTERVAL)
 
@@ -171,12 +177,17 @@ def user_list_scrape(thread_name):
 
                 # 判断返回的数据是否有效，若有效再继续对数据进行分析
                 if follower_list_response is not None:
-                    # 添加到待分析队列
-                    DataParser.add_data_into_user_list_cache_queue({
-                        DataParser.QUEUE_ELEM_HTML: follower_list_response.text,
-                        DataParser.QUEUE_ELEM_TOKEN: token,
-                        DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
-                    cur_page += 1
+                    if follower_list_response == 'reuse':
+                        # 重新分析该页的列表
+                        continue
+                    else:
+                        # 添加到待分析队列
+                        DataParser.add_data_into_user_list_cache_queue({
+                            DataParser.QUEUE_ELEM_HTML: follower_list_response.text,
+                            DataParser.QUEUE_ELEM_TOKEN: token,
+                            DataParser.QUEUE_ELEM_THREAD_NAME: thread_name})
+                        cur_page += 1
+
                 time.sleep(SCRAPE_TIME_INTERVAL)
 
 
@@ -235,7 +246,9 @@ def start_scrape():
     user_info_parser_thread = DataParser.UserInfoDataParserThread()
     user_list_parser_thread = DataParser.UserListDataParserThread()
     user_info_parser_thread.start()
+    print('用户信息数据解析线程启动!!!')
     user_list_parser_thread.start()
+    print('用户列表数据分析线程启动!!!')
 
     # 用户信息爬取线程列表
     user_info_scrape_thread_list = []
@@ -259,11 +272,13 @@ def start_scrape():
         if user_info_parser_thread.status == 'error':
             user_info_parser_thread = DataParser.UserInfoDataParserThread()
             user_info_parser_thread.start()
+            print('[info]用户信息解析线程重新启动')
 
         # 检测用户列表解析线程
         if user_list_parser_thread.status == 'error':
             user_list_parser_thread = DataParser.UserListDataParserThread()
             user_list_parser_thread.start()
+            print('[info]用户列表解析线程重新启动')
 
         # 检测用户信息爬取线程
         for thread in user_info_scrape_thread_list:
@@ -272,7 +287,7 @@ def start_scrape():
                 user_info_scrape_thread_list.remove(thread)
                 new_thread = UserInfoScrapeThread(thread_name)
                 user_info_scrape_thread_list.append(new_thread)
-                print('[' + thread_name + ']重新启动线程')
+                print('[info]用户信息爬取线程“' + thread_name + '”重新启动')
                 new_thread.start()
 
         # 检测用户列表爬取线程
@@ -282,7 +297,7 @@ def start_scrape():
                 user_list_scrape_thread_list.remove(thread)
                 new_thread = UserListScrapeThread(thread_name)
                 user_list_scrape_thread_list.append(new_thread)
-                print('[' + thread_name + ']重新启动线程')
+                print('[info]用户列表爬取线程“' + thread_name + '”重新启动')
                 new_thread.start()
 
         # 检测间隔

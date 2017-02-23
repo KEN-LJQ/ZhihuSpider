@@ -18,7 +18,7 @@ PROXY_REQUEST_MAX = 10000
 # 发生网络异常重试次数
 NETWORK_ERROR_RETRY_TIME = 3
 # 发生响应异常重试次数
-RESPONSE_ERROR_RETRY_TIME = 10
+RESPONSE_ERROR_RETRY_TIME = 5
 # 网络连接超时（单位：秒）
 NETWORK_TIMEOUT = 30
 
@@ -41,7 +41,8 @@ def init_network(proxy_setting):
 
     # 启动代理守护线程
     if is_proxy_enable is True:
-        proxyCore.start_proxy_core()
+        proxy_daemon_thread = proxyCore.ProDaemonThread()
+        proxy_daemon_thread.start()
 
     print('网络配置完毕')
 

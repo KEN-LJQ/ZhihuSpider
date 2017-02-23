@@ -1,8 +1,10 @@
-create database zhihu_spider;
+CREATE DATABASE zhihu_spider1
+DEFAULT CHARACTER SET utf8
+DEFAULT COLLATE utf8_general_ci;
 
-use zhihu_spider;
+use zhihu_spider1;
 
-create table user_info
+CREATE TABLE user_info
 (
 	id int auto_increment primary key,
     user_avator_url varchar(50),
@@ -22,14 +24,14 @@ create table user_info
     user_question_count int,
     user_voteup_count int,
     index(user_token)
-);
+)ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;
 
-create table user_list_cache
+CREATE TABLE user_list_cache
 (
 	user_token varchar(50) primary key
-);
+)ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;
 
-create table analysed_user_list_cache
+CREATE TABLE analysed_user_list_cache
 (
 	user_token varchar(50) primary key
-);
+)ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;

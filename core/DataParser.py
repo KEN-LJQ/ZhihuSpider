@@ -66,7 +66,7 @@ class UserInfoDataParserThread(threading.Thread):
         self.status = 'running'
 
     def run(self):
-        print('用户信息数据解析线程启动!!!')
+        # print('用户信息数据解析线程启动!!!')
         try:
             while True:
                 raw_data = None
@@ -89,6 +89,7 @@ class UserInfoDataParserThread(threading.Thread):
                         DBConnector.add_user_info(convert_user_info(user_info))
                         UserList.add_token_into_analysed_cache_queue([token])
         except Exception as e:
+            print('[error]用户信息数据解析线程抛出了一个异常:')
             print(e)
             self.status = 'error'
 
@@ -100,7 +101,7 @@ class UserListDataParserThread(threading.Thread):
         self.status = 'running'
 
     def run(self):
-        print('用户列表数据分析线程启动!!!')
+        # print('用户列表数据分析线程启动!!!')
         try:
             while True:
                 raw_data = None
@@ -121,6 +122,7 @@ class UserListDataParserThread(threading.Thread):
                         print('[' + thread_name + ']开始分析用户“' + token + '”的关注列表')
                         UserList.add_token_into_cache_queue(token_list)
         except Exception as e:
+            print('[error]用户列表数据分析线程抛出了一个异常：')
             print(e)
             self.status = 'error'
 
