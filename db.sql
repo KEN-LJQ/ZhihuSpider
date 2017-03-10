@@ -1,8 +1,8 @@
-CREATE DATABASE zhihu_spider1
+CREATE DATABASE zhihu_spider
 DEFAULT CHARACTER SET utf8
 DEFAULT COLLATE utf8_general_ci;
 
-use zhihu_spider1;
+use zhihu_spider;
 
 CREATE TABLE user_info
 (

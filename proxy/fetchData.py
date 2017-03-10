@@ -13,33 +13,38 @@ requestHeader = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.
                                "(KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36"}
 
 # 连接重试次数
-NETWORK_RETRY_TIME = 3
+NETWORK_RETRY_TIMES = 3
 # 连接重试间隔(单位：秒)
-NETWORK_RETRY_INTERVAL = 30
+NETWORK_RECONNECT_INTERVAL = 30
+# 连接超时设置（单位：秒）
+CONNECT_TIMEOUT = 30
 
-# 当前连接
-session = requests.session()
 
+class DataFetchModule:
+    def __init__(self):
+        # 当前连接
+        self.session = requests.session()
 
-# 获取代理信息
-def fetch_proxy_data(page):
-    # 设置连接信息
-    session.headers = requestHeader
+    # 获取代理信息
+    def fetch_proxy_data(self, page):
+        # 设置连接信息
+        self.session.headers = requestHeader
 
-    # 构造请求 URL
-    url = requestUrl + str(page)
+        # 构造请求 URL
+        url = requestUrl + str(page)
 
-    # 获取数据
-    retry_time = 0
-    while retry_time < NETWORK_RETRY_TIME:
-        try:
-            response = session.get(url)
-            return response.text
-        except Exception:
-            # 网络异常
-            print("[代理模块]网络异常，代理信息获取失败")
-            retry_time += 1
-    time.sleep(NETWORK_RETRY_INTERVAL)
+        # 获取数据
+        retry_time = 0
+        while retry_time < NETWORK_RETRY_TIMES:
+            try:
+                response = self.session.get(url, timeout=CONNECT_TIMEOUT)
+                return response.text
+            except Exception:
+                # 网络异常
+                # print("[代理模块]网络异常，代理信息获取失败")
+                retry_time += 1
+        time.sleep(NETWORK_RECONNECT_INTERVAL)
 
-    # 超过重试次数返回 None
-    return None
+        # 超过重试次数返回 None
+        return None
+
