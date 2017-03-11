@@ -2,8 +2,9 @@ import html
 import json
 import queue
 import threading
-
+import logging
 from bs4 import BeautifulSoup
+from core.Logger import log
 
 # 知乎用户信息字段
 # 用户头像
@@ -140,12 +141,13 @@ class UserInfoDataParserThread(threading.Thread):
                 if raw_data is not None and token is not None:
                     user_info = self.parse_user_information(raw_data, token)
                     if user_info is not None:
-                        print('[' + thread_name + "]搜索到一个用户:" + user_info['name'])
+                        if log.isEnabledFor(logging.DEBUG):
+                            log.debug('[' + thread_name + "]搜索到一个用户:" + user_info['name'])
                         self.db_connection.add_user_info(self.convert_user_info(user_info))
                         self.user_token_cache_queue.add_token_into_analysed_cache_queue([token])
         except Exception as e:
-            print('[error]用户信息数据解析线程抛出了一个异常:')
-            print(e)
+            if log.isEnabledFor(logging.ERROR):
+                log.error(e)
             self.status = 'error'
 
     # 解析 html 中的知乎用户信息
@@ -171,7 +173,8 @@ class UserInfoDataParserThread(threading.Thread):
             # 防止解析到的 JSON 格式错误而引发异常
             json_data = json.loads(data_string)
         except ValueError:
-            print('[error]解析到错误的 json 数据')
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug('[error]解析到错误的 json 数据')
             return None
 
         # 提取实体
@@ -341,11 +344,12 @@ class UserListDataParserThread(threading.Thread):
                 if raw_data is not None and token is not None:
                     token_list = self.parse_user_list(raw_data, token)
                     if token_list is not None:
-                        print('[' + thread_name + ']开始分析用户“' + token + '”的关注列表')
+                        if log.isEnabledFor(logging.DEBUG):
+                            log.debug('[' + thread_name + ']开始分析用户“' + token + '”的关注列表')
                         self.user_token_cache_queue.add_token_into_cache_queue(token_list)
         except Exception as e:
-            print('[error]用户列表数据分析线程抛出了一个异常：')
-            print(e)
+            if log.isEnabledFor(logging.ERROR):
+                log.error(e)
             self.status = 'error'
 
     # 解析 html 中的用户列表

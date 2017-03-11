@@ -1,10 +1,12 @@
 from proxy import validateData
 from proxy import fetchData
 from proxy import parseData
+from core.Logger import log
 import time
 import threading
 import queue
 import configparser
+import logging
 
 # 代理信息键值字段
 PROXY_ID = 'id'
@@ -51,10 +53,14 @@ class ProxyDaemonThread(threading.Thread):
             validate_thread = ProxyValidateThread()
             validate_thread_list.append(validate_thread)
             validate_thread.start()
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("代理验证线程启动")
 
         # 启动代理池扫描线程
         scan_thread = ProxyPoolScanThread()
         scan_thread.start()
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("代理池扫描线程启动")
 
         # 检查是否有线程出现异常并将其重启
         while True:
@@ -65,13 +71,15 @@ class ProxyDaemonThread(threading.Thread):
                     thread = ProxyValidateThread()
                     validate_thread_list.append(thread)
                     thread.start()
-                    print('[info]代理验证线程重新启动')
+                    if log.error(logging.ERROR):
+                        log.error('代理验证线程重新启动')
 
             # 检查代理池扫描线程
             if scan_thread.status == 'error':
                 scan_thread = ProxyPoolScanThread()
                 scan_thread.start()
-                print('[info]代理池扫描线程重新启动')
+                if log.isEnabledFor(logging.ERROR):
+                    log.error("代理池扫描线程重新启动")
 
             time.sleep(180)
 
@@ -82,11 +90,14 @@ class ProxyDaemonThread(threading.Thread):
         config = configparser.ConfigParser()
         config.read('proxy/proxyConfiguration.conf', encoding='utf8')
 
+        # validateData配置
         validateData.CONNECT_TIMEOUT = int(config.get(section, "proxyValidate_connectTimeout"))
         validateData.NETWORK_RECONNECT_TIMES = int(config.get(section, "proxyValidate_networkReconnectTimes"))
+        # fetchData配置
         fetchData.CONNECT_TIMEOUT = int(config.get(section, "dataFetch_connectTimeout"))
         fetchData.NETWORK_RECONNECT_INTERVAL = int(config.get(section, "dataFetch_networkReconnectInterval"))
         fetchData.NETWORK_RETRY_TIMES = int(config.get(section, "dataFetch_networkReconnectionTimes"))
+        # proxyCore配置
         global FETCH_START_PAGE
         global FETCH_END_PAGE
         global PROXY_POOL_SIZE
@@ -109,7 +120,6 @@ class ProxyValidateThread(threading.Thread):
 
     def run(self):
         try:
-            # print('代理验证线程启动')
             while True:
                 # 若正在扫描代理池，则暂停
                 while is_scanning:
@@ -125,8 +135,8 @@ class ProxyValidateThread(threading.Thread):
                 else:
                     time.sleep(5)
         except Exception as e:
-            print('[error]代理验证线程抛出了一个异常：')
-            print(e)
+            if log.isEnabledFor(logging.ERROR):
+                log.error(e)
             self.status = 'error'
 
 
@@ -143,19 +153,19 @@ class ProxyPoolScanThread(threading.Thread):
 
     def run(self):
         try:
-            # print('代理池扫描线程启动')
             while True:
                 if proxy_pool.qsize() < PROXY_POOL_SIZE and unchecked_proxy_list.qsize() < PROXY_POOL_SIZE:
                     self.fetch_and_parse_proxy()
                 elif proxy_pool.qsize() == PROXY_POOL_SIZE:
-                    # print('更新代理池')
+                    if log.isEnabledFor(logging.DEBUG):
+                        log.debug('代理池更新')
                     self.scan_proxy_pool()
                     time.sleep(PROXY_POOL_SCAN_INTERVAL)
                 else:
                     time.sleep(60)
         except Exception as e:
-            print('[error]代理池扫描线程抛出了一个异常：')
-            print(e)
+            if log.isEnabledFor(logging.ERROR):
+                log.error(e)
             self.status = 'error'
 
     # 扫描代理池中的代理

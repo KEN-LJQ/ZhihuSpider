@@ -1,6 +1,8 @@
 import requests
 import re
+import logging
 from proxy import proxyCore
+from core.Logger import log
 
 # 代理 IP 验证网站
 url = 'http://icanhazip.com/'
@@ -47,6 +49,8 @@ class DataValidateModule:
                 if len(match_list) > 0:
                     current_ip = match_list.pop()
                     if current_ip is not None and current_ip == proxy_ip:
+                        if log.isEnabledFor(logging.DEBUG):
+                            log.debug("获取到一个可用的代理IP")
                         return True
                 else:
                     retry_time += 1

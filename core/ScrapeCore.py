@@ -2,9 +2,12 @@ import core.DBConnector as DBConnector
 import core.DataFetch as DataFetch
 import core.DataParser as DataParser
 import core.UserList as UserList
+import core.Logger as Logger
 import time
 import threading
 import configparser
+import logging
+from core.Logger import log
 
 # URL 组件
 URL_PUBLIC = 'https://www.zhihu.com/people/'
@@ -53,18 +56,19 @@ class UserInfoScrapeThread(threading.Thread):
         try:
             self.user_info_scrape()
         except Exception as e:
-            print('[error]an Exception occur on ' + str(self.thread_name) + ':')
-            print(e)
+            if log.isEnabledFor(logging.ERROR):
+                log.error(e)
             self.status = 'error'
 
     # 爬取用户信息
     def user_info_scrape(self):
-        print('用户信息爬取线程[' + self.thread_name + ']正在等待连接...')
 
         # 为该线程绑定 session
         self.data_fetch_module.thread_bind_session(self.thread_name)
 
-        print('用户信息爬取线程[' + self.thread_name + ']开始运行')
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug('用户信息爬取线程[' + self.thread_name + ']开始运行')
+
         while True:
             # 从未分析 token 缓存列表中获取一个可用的token
             while True:
@@ -121,18 +125,19 @@ class UserListScrapeThread(threading.Thread):
         try:
             self.user_list_scrape()
         except Exception as e:
-            print('[error]an Exception occur on ' + str(self.thread_name) + ':')
-            print(e)
+            if log.isEnabledFor(logging.ERROR):
+                log.error(e)
             self.status = 'error'
 
     # 爬取用户列表
     def user_list_scrape(self):
-        print('用户列表爬取线程[' + self.thread_name + ']正在等待连接...')
 
         # 为该线程绑定 session
         self.data_fetch_module.thread_bind_session(self.thread_name)
 
-        print('用户列表爬取线程[' + self.thread_name + ']开始运行')
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug('用户列表爬取线程[' + self.thread_name + ']开始运行')
+
         while True:
             # 从已分析 token 缓存列表中获取一个可用的token
             while True:
@@ -256,7 +261,7 @@ class SpiderCore:
         # 初始化用户线程爬取线程
         self.user_info_scrape_thread_list = []
         for thread_count in range(USER_INFO_SCRAPE_THREAD_NUM):
-            thread_name = 'user-info-scrape-thread' + str(thread_count)
+            thread_name = 'Info-Thread' + str(thread_count)
             user_info_scrape_thread = UserInfoScrapeThread(thread_name, self.DBConnectModule, self.dataFetchModule,
                                                            self.userTokenCacheQueue, self.cacheQueue)
             self.user_info_scrape_thread_list.append(user_info_scrape_thread)
@@ -264,7 +269,7 @@ class SpiderCore:
         # 初始化用户列表爬取线程
         self.user_list_scrape_thread_list = []
         for thread_count in range(USER_LIST_SCRAPE_THREAD_NUM):
-            thread_name = 'user-list-scrape-thread' + str(thread_count)
+            thread_name = 'List-Thread' + str(thread_count)
             user_list_scrape_thread = UserListScrapeThread(thread_name, self.DBConnectModule, self.dataFetchModule,
                                                            self.userTokenCacheQueue, self.cacheQueue)
             self.user_info_scrape_thread_list.append(user_list_scrape_thread)
@@ -273,12 +278,13 @@ class SpiderCore:
         if start_token != '':
             self.userTokenCacheQueue.add_token_into_cache_queue([start_token])
 
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("爬虫核心模块初始化完毕")
+
     def start_spider(self):
         # 启动数据解析线程
         self.dataParseModule.start_user_info_data_parse_thread()
-        print('用户信息数据解析线程启动!!!')
         self.dataParseModule.start_user_list_data_parse_thread()
-        print('用户列表数据分析线程启动!!!')
 
         # 启动用户信息爬取线程
         for user_info_scrape_thread in self.user_info_scrape_thread_list:
@@ -293,12 +299,14 @@ class SpiderCore:
             # 检测用户信息解析线程
             if self.dataParseModule.get_user_info_data_parse_thread_status() == 'error':
                 self.dataParseModule.restart_user_info_data_parse_thread()
-                print('[info]用户信息解析线程重新启动')
+                if log.isEnabledFor(logging.ERROR):
+                    log.error('用户信息解析线程重新启动')
 
             # 检测用户列表解析线程
             if self.dataParseModule.get_user_list_data_parse_thread_status() == 'error':
                 self.dataParseModule.restart_user_list_data_parse_thread()
-                print('[info]用户列表解析线程重新启动')
+                if log.isEnabledFor(logging.ERROR):
+                    log.error('用户信息解析线程重新启动')
 
             # 检测用户信息爬取线程
             for thread in self.user_info_scrape_thread_list:
@@ -308,8 +316,9 @@ class SpiderCore:
                     new_thread = UserInfoScrapeThread(thread_name, self.DBConnectModule, self.dataFetchModule,
                                                       self.userTokenCacheQueue, self.cacheQueue)
                     self.user_info_scrape_thread_list.append(new_thread)
-                    print('[info]用户信息爬取线程“' + thread_name + '”重新启动')
                     new_thread.start()
+                    if log.isEnabledFor(logging.ERROR):
+                        log.error('用户信息爬取线程[' + thread_name + ']重新启动')
 
             # 检测用户列表爬取线程
             for thread in self.user_list_scrape_thread_list:
@@ -319,8 +328,9 @@ class SpiderCore:
                     new_thread = UserListScrapeThread(thread_name, self.DBConnectModule, self.dataFetchModule,
                                                       self.userTokenCacheQueue, self.cacheQueue)
                     self.user_list_scrape_thread_list.append(new_thread)
-                    print('[info]用户列表爬取线程“' + thread_name + '”重新启动')
                     new_thread.start()
+                    if log.isEnabledFor(logging.ERROR):
+                        log.error('用户列表爬取线程[' + thread_name + ']重新启动')
 
             # 检测间隔
             time.sleep(180)
@@ -371,6 +381,9 @@ class SpiderCore:
         DBConnector.DB_PASSWORD = config.get(section, "dbPassword")
         DBConnector.DB_DATABASE = config.get(section, "dbDatabase")
         DBConnector.DB_CHARSET = config.get(section, "dbCharset")
+        
+        # 日志配置
+        Logger.LOGGING_TYPE = config.get(section, 'logging')
 
 # if __name__ == '__main__':
 #     section = "spider_core"

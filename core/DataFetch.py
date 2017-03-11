@@ -2,6 +2,8 @@ import requests
 from proxy import proxyCore
 import time
 import threading
+import logging
+from core.Logger import log
 
 # 请求头信息
 requestHeader = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -65,7 +67,9 @@ class DataFetchModule:
 
     # 更换代理
     def switch_proxy(self, thread_name):
-        print('[' + str(thread_name) + ']' + '正在更换代理')
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug('[' + str(thread_name) + ']' + '正在更换代理')
+
         # 获取绑定的session
         if thread_name in self.session_bind_list:
             self.thread_lock.acquire()
@@ -95,7 +99,8 @@ class DataFetchModule:
         self.session_bind_list.update({thread_name: session})
         self.session_count_list.update({thread_name: 0})
         self.thread_lock.release()
-        print('[' + str(thread_name) + ']' + '代理更换成功')
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug('[' + str(thread_name) + ']' + '代理更换成功')
 
     # 获取指定 URL 的数据
     def fetch_data_of_url(self, url, thread_name):
@@ -118,7 +123,8 @@ class DataFetchModule:
         # 连接到指定的 URL
         network_reconnect_times = 0
         response_error_retry_time = 0
-        while network_reconnect_times < NETWORK_RECONNECT_TIMES and response_error_retry_time < RESPONSE_ERROR_RETRY_TIME:
+        while network_reconnect_times < NETWORK_RECONNECT_TIMES \
+                and response_error_retry_time < RESPONSE_ERROR_RETRY_TIME:
             # 若代理使用次数过多则更换
             if self.is_proxy_enable is True:
                 if session_count >= PROXY_USAGE_MAX:
@@ -140,21 +146,26 @@ class DataFetchModule:
                     self.thread_lock.release()
                     return response
                 elif response.status_code == 429:
-                    print('[' + str(thread_name) + ']' + '访问太频繁，稍候重新访问，响应码为：' + str(response.status_code))
+                    if log.isEnabledFor(logging.DEBUG):
+                        log.debug('[' + str(thread_name) + ']' + '访问太频繁，稍候重新访问，响应码为：' + str(response.status_code))
                     response_error_retry_time += 1
                     time.sleep(40)
                 elif response.status_code == 404 or response.status_code == 410:
                     return None
                 elif self.is_proxy_enable is True:
                     # 代理可能已被屏蔽, 重试
-                    print('[' + str(thread_name) + ']' + '接收到不正确响应， 响应码为：' + str(response.status_code))
+                    if log.isEnabledFor(logging.DEBUG):
+                        log.debug('[' + str(thread_name) + ']' + '接收到不正确响应， 响应码为：' + str(response.status_code))
                     response_error_retry_time += 1
                     continue
 
-            except Exception:
+            except Exception as e:
                 # 网络异常重试
                 network_reconnect_times += 1
-                print('[' + str(thread_name) + ']' + '网络异常，正在重新连接...（第' + str(network_reconnect_times) + '次重试)')
+                if log.isEnabledFor(logging.DEBUG):
+                    log.debug('[' + str(thread_name) + ']' + '网络异常，正在重新连接...（第' + str(network_reconnect_times) + '次重试)')
+                if log.isEnabledFor(logging.ERROR):
+                    log.error(e)
 
         # 若达到最大的重试次数则更换代理
         if self.is_proxy_enable is True:
