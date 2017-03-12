@@ -7,6 +7,7 @@
 * 无需登陆知乎账号
 * 使用多线程爬取，并可以自行配置使用的线程数目
 * 使用高匿代理IP进行数据的爬取，每一个线程独立一个代理IP，并且失效后会重新分配，避免频繁访问导致本机 IP 被封
+* 可以启用邮件定时通知功能
 
 
 
@@ -180,9 +181,9 @@ analyseFollowingList = 1
 # 是否分析关注者列表(1代表是，0代表否)
 analyse_FollowerList = 1
 # 用户信息抓取线程数量
-userInfoScrapeThreadNum = 8
+userInfoScrapeThreadNum = 1
 # 用户列表抓取线程数量
-userListScrapeThreadNum = 8
+userListScrapeThreadNum = 1
 # 是否使用代理(1代表是，0代表否)
 isProxyEnable = 1
 
@@ -198,21 +199,40 @@ connectTimeout = 30
 # 已分析用户信息的用户 token 缓存列表大小
 maxAnalysedCacheQueueSize = 1000
 # 已分析用户信息的缓存列表保留大小
-remainAnalysedCacheQueueSize = 10
+remainAnalysedCacheQueueSize = 100
 # 未分析用户信息的用户 token 缓存列表大小
 maxCacheQueueSize = 1000
 # 未分析用户信息的用户 token 缓存列表保留大小
-remainCacheQueueSize = 10
+remainCacheQueueSize = 100
 
 # 数据库配置
 dbHost = localhost
 dbUsername = root
-dbPassword = LJQ20110627
-dbDatabase = zhihu_spider_test
+dbPassword = xxx
+dbDatabase = zhihu_spider
 dbCharset = utf8
 
 # 爬虫起始token
 startToken =
+
+
+# 发送Email设置
+# 是否启用邮件通知(1代表是，0代表否,默认否)
+isEmailNotificationEnable = 1
+# SMTP邮件服务器域名
+smtpServerHost = smtp.mxhichina.com
+# SMTP邮件服务器端口
+smtpServerPort = 25
+# SMTP邮件服务器登陆密码
+smtpServerPassword = xxx
+# 邮件发送人地址
+smtpFromAddr = xxx
+# 邮件接收人地址
+smtpToAddr = xxx
+# 邮件标题
+smtpEmailHeader = xxx
+# 邮件发送间隔(单位：秒)
+smtpSendInterval = 3600
 ```
 
 ```

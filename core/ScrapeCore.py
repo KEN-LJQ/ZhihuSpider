@@ -2,7 +2,7 @@ import core.DBConnector as DBConnector
 import core.DataFetch as DataFetch
 import core.DataParser as DataParser
 import core.UserList as UserList
-import core.Logger as Logger
+import core.EmailService as EmailService
 import time
 import threading
 import configparser
@@ -36,6 +36,9 @@ USER_LIST_SCRAPE_THREAD_NUM = 8
 
 # 是否使用代理
 IS_PROXY_ENABLE = True
+
+# 是否使用邮件通知
+IS_EMAIL_NOTIFICATION_ENABLE = False
 
 # 爬虫起始 token
 start_token = ''
@@ -257,6 +260,8 @@ class SpiderCore:
         # 初始化数据解析模块
         self.dataParseModule = DataParser.DataParseModule(self.DBConnectModule, self.userTokenCacheQueue,
                                                           self.cacheQueue)
+        # 初始化邮件服务模块
+        self.emailService = EmailService.EmailService(self.DBConnectModule)
 
         # 初始化用户线程爬取线程
         self.user_info_scrape_thread_list = []
@@ -282,6 +287,9 @@ class SpiderCore:
             log.debug("爬虫核心模块初始化完毕")
 
     def start_spider(self):
+        # 启动定时邮件线程
+        self.emailService.start_email_notification_service()
+
         # 启动数据解析线程
         self.dataParseModule.start_user_info_data_parse_thread()
         self.dataParseModule.start_user_list_data_parse_thread()
@@ -294,8 +302,16 @@ class SpiderCore:
         for user_list_scrape_thread in self.user_list_scrape_thread_list:
             user_list_scrape_thread.start()
 
+        self.emailService.send_message("爬虫启动成功")
+
         # 工作线程检测并重启
         while True:
+            # 检测邮件服务线程
+            if self.emailService.get_email_notification_service_status() == 'error':
+                self.emailService.restart_email_notification_service()
+                if log.isEnabledFor(logging.ERROR):
+                    log.error('邮件服务线程重新启动')
+
             # 检测用户信息解析线程
             if self.dataParseModule.get_user_info_data_parse_thread_status() == 'error':
                 self.dataParseModule.restart_user_info_data_parse_thread()
@@ -352,15 +368,17 @@ class SpiderCore:
         global USER_LIST_SCRAPE_THREAD_NUM
         global IS_PROXY_ENABLE
         global start_token
+        global IS_EMAIL_NOTIFICATION_ENABLE
         PAGE_SIZE = int(config.get(section, "pageSize"))
         SCRAPE_TIME_INTERVAL = int(config.get(section, "scrapeTimeInterval"))
         FOLLOWING_PAGE_MAX = int(config.get(section, "followingPageMax"))
         FOLLOWER_PAGE_MAX = int(config.get(section, "followerPageMax"))
-        ANALYSE_FOLLOWING_LIST = True if int(config.get(section, "analyseFollowingList")) != 0 else False
-        ANALYSE_FOLLOWER_LIST = True if int(config.get(section, "analyse_FollowerList")) != 0 else False
+        ANALYSE_FOLLOWING_LIST = True if int(config.get(section, "analyseFollowingList")) == 1 else False
+        ANALYSE_FOLLOWER_LIST = True if int(config.get(section, "analyse_FollowerList")) == 1 else False
         USER_INFO_SCRAPE_THREAD_NUM = int(config.get(section, "userInfoScrapeThreadNum"))
         USER_LIST_SCRAPE_THREAD_NUM = int(config.get(section, "userListScrapeThreadNum"))
-        IS_PROXY_ENABLE = True if int(config.get(section, "isProxyEnable")) != 0 else False
+        IS_PROXY_ENABLE = True if int(config.get(section, "isProxyEnable")) == 1 else False
+        IS_EMAIL_NOTIFICATION_ENABLE = True if int(config.get(section, "isEmailNotificationEnable")) == 1 else False
         start_token = config.get(section, "startToken")
 
         # DataFetch配置
@@ -381,9 +399,15 @@ class SpiderCore:
         DBConnector.DB_PASSWORD = config.get(section, "dbPassword")
         DBConnector.DB_DATABASE = config.get(section, "dbDatabase")
         DBConnector.DB_CHARSET = config.get(section, "dbCharset")
-        
-        # 日志配置
-        Logger.LOGGING_TYPE = config.get(section, 'logging')
+
+        # 邮件通知配置
+        EmailService.SMTP_SERVER_HOST = config.get(section, "smtpServerHost")
+        EmailService.SMTP_SERVER_PORT = int(config.get(section, "smtpServerPort"))
+        EmailService.SMTP_SERVER_PASSWORD = config.get(section, "smtpServerPassword")
+        EmailService.SMTP_FROM_ADDR = config.get(section, "smtpFromAddr")
+        EmailService.SMTP_TO_ADDR = config.get(section, "smtpToAddr")
+        EmailService.SMTP_EMAIL_HEADER = config.get(section, "smtpEmailHeader")
+        EmailService.SMTP_SEND_INTERVAL = int(config.get(section, "smtpSendInterval"))
 
 # if __name__ == '__main__':
 #     section = "spider_core"

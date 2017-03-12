@@ -63,6 +63,7 @@ INSERT_USER_INFO = 'insert ignore into user_info(user_avator_url, user_token, us
                    'user_gender, user_following_count, user_follower_count, user_answer_count, ' \
                    'user_question_count, user_voteup_count) values(%s,%s,%s,%s,%s,%s,%s,%s,' \
                    '%s,%s,%s,%s,%s,%s,%s)'
+COUNT_USER_INFO = 'select count(*) from user_info'
 
 
 class DBConnectModule:
@@ -123,6 +124,18 @@ class DBConnectModule:
         self.connection_lock.acquire()
         cur = self.connection.cursor()
         cur.execute(COUNT_TOKEN)
+        data = cur.fetchone()
+        cur.close()
+        self.connection_lock.release()
+        return data[0]
+
+    # 获取数据库中用户信息的数目
+    def get_user_info_num(self):
+        if self.connection is None:
+            return None
+        self.connection_lock.acquire()
+        cur = self.connection.cursor()
+        cur.execute(COUNT_USER_INFO)
         data = cur.fetchone()
         cur.close()
         self.connection_lock.release()

@@ -14,8 +14,6 @@ REMAIN_CACHE_QUEUE_SIZE = 100
 
 class UserTokenCacheQueue:
     def __init__(self, db_connection):
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug('正在配置用户 Token 缓存列表...')
         self.db_connection = db_connection
         self.analysed_cache_queue = queue.Queue(MAX_ANALYSED_CACHE_QUEUE_SIZE)
         self.cache_queue = queue.Queue(MAX_CACHE_QUEUE_SIZE)
@@ -33,7 +31,7 @@ class UserTokenCacheQueue:
             for token in temp_list:
                 self.analysed_cache_queue.put(token)
         if log.isEnabledFor(logging.DEBUG):
-            log.debug('用户 Token 缓存列表配置完毕!!!')
+            log.debug('用户 Token 缓存列表初始化完毕')
 
     # 从数据库未分析列表取出指定数目的 token
     def get_token_from_db(self, num):
