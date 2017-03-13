@@ -3,6 +3,7 @@ import core.DataFetch as DataFetch
 import core.DataParser as DataParser
 import core.UserList as UserList
 import core.EmailService as EmailService
+import core.BloomFilter as BloomFilter
 import time
 import threading
 import configparser
@@ -44,23 +45,25 @@ IS_EMAIL_NOTIFICATION_ENABLE = False
 start_token = ''
 
 
-# 用户信息分析线程
+# 用户信息抓取线程
 class UserInfoScrapeThread(threading.Thread):
-    def __init__(self, thread_name, db_connection, data_fetch_module, user_token_cache_queue, cache_queue):
+    def __init__(self, thread_name, data_fetch_module, user_token_cache_queue, cache_queue, bloom_filter):
         threading.Thread.__init__(self)
         self.thread_name = thread_name
-        self.db_connection = db_connection
         self.data_fetch_module = data_fetch_module
         self.user_token_cache_queue = user_token_cache_queue
         self.cache_queue = cache_queue
+        self.bloom_filter = bloom_filter
         self.status = 'running'
 
     def run(self):
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug('用户信息抓取线程' + self.thread_name + '启动')
         try:
             self.user_info_scrape()
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
-                log.error(e)
+                log.exception(e)
             self.status = 'error'
 
     # 爬取用户信息
@@ -77,7 +80,7 @@ class UserInfoScrapeThread(threading.Thread):
             while True:
                 token = self.user_token_cache_queue.get_token_from_cache_queue()
                 if token is not None:
-                    if self.is_token_available(token) is True:
+                    if self.is_token_available(token) is False:
                         break
                 else:
                     time.sleep(0.5)
@@ -101,11 +104,9 @@ class UserInfoScrapeThread(threading.Thread):
 
     # 判断 token 是否可用
     def is_token_available(self, token):
-        # 判断能否在数据库查询到该 token 对应的信息
-        if self.db_connection.select_user_info_by_token(token) is not None:
-            return False
-        else:
-            return True
+        # 使用布隆过滤器判断
+        result = self.bloom_filter.exists(token)
+        return result
 
     # 生成 token 对应用户的个人主页 URL
     @staticmethod
@@ -113,7 +114,7 @@ class UserInfoScrapeThread(threading.Thread):
         return URL_PUBLIC + token + URL_ANSWER
 
 
-# 用户关注列表分析线程
+# 用户关注列表抓取线程
 class UserListScrapeThread(threading.Thread):
     def __init__(self, thread_name, db_connection, data_fetch_module, user_token_cache_queue, cache_queue):
         threading.Thread.__init__(self)
@@ -125,11 +126,13 @@ class UserListScrapeThread(threading.Thread):
         self.status = 'running'
 
     def run(self):
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug('用户列表抓取线程' + self.thread_name + '启动')
         try:
             self.user_list_scrape()
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
-                log.error(e)
+                log.exception(e)
             self.status = 'error'
 
     # 爬取用户列表
@@ -144,31 +147,17 @@ class UserListScrapeThread(threading.Thread):
         while True:
             # 从已分析 token 缓存列表中获取一个可用的token
             while True:
-                token = self.user_token_cache_queue.get_token_form_analysed_cache_queue()
-                if token is not None:
+                token_info = self.user_token_cache_queue.get_token_form_analysed_cache_queue()
+                if token_info is not None:
                     break
                 time.sleep(0.5)
-
-            # 获取该 token 对应的用户信息
-            user_info = None
-            retry = 3
-            while retry > 0:
-                user_info = self.db_connection.select_user_info_by_token(token)
-                if user_info is None:
-                    retry -= 1
-                    time.sleep(1)
-                else:
-                    break
-
-            if user_info is None:
-                continue
 
             # 分析正在关注列表
             if ANALYSE_FOLLOWING_LIST is True:
                 # 计算页码范围
                 following_page_size = 1
-                if DataParser.USER_FOLLOWING_COUNT in user_info:
-                    following_page_size = self.calculate_max_page(user_info[DataParser.USER_FOLLOWING_COUNT])
+                if DataParser.USER_FOLLOWING_COUNT in token_info:
+                    following_page_size = self.calculate_max_page(token_info[DataParser.USER_FOLLOWING_COUNT])
                 if 0 < FOLLOWING_PAGE_MAX < following_page_size:
                     following_page_size = FOLLOWING_PAGE_MAX
 
@@ -177,7 +166,8 @@ class UserListScrapeThread(threading.Thread):
                 while cur_page <= following_page_size:
                     # 获取数据
                     following_list_response = self.data_fetch_module.fetch_data_of_url(
-                        self.generate_following_list_url(token, cur_page), self.thread_name)
+                        self.generate_following_list_url(token_info[DataParser.USER_URL_TOKEN], cur_page),
+                        self.thread_name)
 
                     # 判断返回的数据是否有效，若有效再对数据进行分析
                     if following_list_response is not None:
@@ -188,7 +178,7 @@ class UserListScrapeThread(threading.Thread):
                             # 添加到分析队列
                             self.cache_queue.add_data_into_user_list_cache_queue({
                                 DataParser.QUEUE_ELEM_HTML: following_list_response.text,
-                                DataParser.QUEUE_ELEM_TOKEN: token,
+                                DataParser.QUEUE_ELEM_TOKEN: token_info[DataParser.USER_URL_TOKEN],
                                 DataParser.QUEUE_ELEM_THREAD_NAME: self.thread_name})
                             cur_page += 1
 
@@ -198,8 +188,8 @@ class UserListScrapeThread(threading.Thread):
             if ANALYSE_FOLLOWER_LIST is True:
                 # 计算页码范围
                 follower_page_size = 1
-                if DataParser.USER_FOLLOWER_COUNT in user_info:
-                    follower_page_size = self.calculate_max_page(user_info[DataParser.USER_FOLLOWER_COUNT])
+                if DataParser.USER_FOLLOWER_COUNT in token_info:
+                    follower_page_size = self.calculate_max_page(token_info[DataParser.USER_FOLLOWER_COUNT])
                 if follower_page_size > FOLLOWER_PAGE_MAX > 0:
                     follower_page_size = FOLLOWER_PAGE_MAX
 
@@ -208,7 +198,8 @@ class UserListScrapeThread(threading.Thread):
                 while cur_page <= follower_page_size:
                     # 获取数据
                     follower_list_response = self.data_fetch_module.fetch_data_of_url(
-                        self.generate_follower_list_url(token, cur_page), self.thread_name)
+                        self.generate_follower_list_url(token_info[DataParser.USER_URL_TOKEN], cur_page),
+                        self.thread_name)
 
                     # 判断返回的数据是否有效，若有效再继续对数据进行分析
                     if follower_list_response is not None:
@@ -219,7 +210,7 @@ class UserListScrapeThread(threading.Thread):
                             # 添加到待分析队列
                             self.cache_queue.add_data_into_user_list_cache_queue({
                                 DataParser.QUEUE_ELEM_HTML: follower_list_response.text,
-                                DataParser.QUEUE_ELEM_TOKEN: token,
+                                DataParser.QUEUE_ELEM_TOKEN: token_info[DataParser.USER_URL_TOKEN],
                                 DataParser.QUEUE_ELEM_THREAD_NAME: self.thread_name})
                             cur_page += 1
 
@@ -251,6 +242,8 @@ class SpiderCore:
 
         # 初始化数据库模块
         self.DBConnectModule = DBConnector.DBConnectModule()
+        # 初始化 BloomFilter 模块
+        self.bloomFilterModule = BloomFilter.BloomFilter()
         # 初始化用户Token缓存
         self.userTokenCacheQueue = UserList.UserTokenCacheQueue(self.DBConnectModule)
         # 初始化待分析网页缓存
@@ -259,16 +252,17 @@ class SpiderCore:
         self.dataFetchModule = DataFetch.DataFetchModule(IS_PROXY_ENABLE)
         # 初始化数据解析模块
         self.dataParseModule = DataParser.DataParseModule(self.DBConnectModule, self.userTokenCacheQueue,
-                                                          self.cacheQueue)
+                                                          self.cacheQueue, self.bloomFilterModule)
         # 初始化邮件服务模块
-        self.emailService = EmailService.EmailService(self.DBConnectModule)
+        if IS_EMAIL_NOTIFICATION_ENABLE is True:
+            self.emailService = EmailService.EmailService(self.DBConnectModule)
 
-        # 初始化用户线程爬取线程
+        # 初始化用户信息爬取线程
         self.user_info_scrape_thread_list = []
         for thread_count in range(USER_INFO_SCRAPE_THREAD_NUM):
             thread_name = 'Info-Thread' + str(thread_count)
-            user_info_scrape_thread = UserInfoScrapeThread(thread_name, self.DBConnectModule, self.dataFetchModule,
-                                                           self.userTokenCacheQueue, self.cacheQueue)
+            user_info_scrape_thread = UserInfoScrapeThread(thread_name, self.dataFetchModule, self.userTokenCacheQueue,
+                                                           self.cacheQueue, self.bloomFilterModule)
             self.user_info_scrape_thread_list.append(user_info_scrape_thread)
 
         # 初始化用户列表爬取线程
@@ -288,7 +282,8 @@ class SpiderCore:
 
     def start_spider(self):
         # 启动定时邮件线程
-        self.emailService.start_email_notification_service()
+        if IS_EMAIL_NOTIFICATION_ENABLE is True:
+            self.emailService.start_email_notification_service()
 
         # 启动数据解析线程
         self.dataParseModule.start_user_info_data_parse_thread()
@@ -302,15 +297,17 @@ class SpiderCore:
         for user_list_scrape_thread in self.user_list_scrape_thread_list:
             user_list_scrape_thread.start()
 
-        self.emailService.send_message("爬虫启动成功")
+        if IS_EMAIL_NOTIFICATION_ENABLE is True:
+            self.emailService.send_message("爬虫启动成功")
 
         # 工作线程检测并重启
         while True:
             # 检测邮件服务线程
-            if self.emailService.get_email_notification_service_status() == 'error':
-                self.emailService.restart_email_notification_service()
-                if log.isEnabledFor(logging.ERROR):
-                    log.error('邮件服务线程重新启动')
+            if IS_EMAIL_NOTIFICATION_ENABLE is True:
+                if self.emailService.get_email_notification_service_status() == 'error':
+                    self.emailService.restart_email_notification_service()
+                    if log.isEnabledFor(logging.ERROR):
+                        log.error('邮件服务线程重新启动')
 
             # 检测用户信息解析线程
             if self.dataParseModule.get_user_info_data_parse_thread_status() == 'error':
@@ -399,6 +396,7 @@ class SpiderCore:
         DBConnector.DB_PASSWORD = config.get(section, "dbPassword")
         DBConnector.DB_DATABASE = config.get(section, "dbDatabase")
         DBConnector.DB_CHARSET = config.get(section, "dbCharset")
+        DBConnector.USER_INFO_BUFFER_SIZE = int(config.get(section, "user_info_buffer_size"))
 
         # 邮件通知配置
         EmailService.SMTP_SERVER_HOST = config.get(section, "smtpServerHost")

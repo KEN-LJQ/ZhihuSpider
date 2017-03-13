@@ -1,5 +1,6 @@
 import pymysql
 import threading
+import queue
 
 # 知乎用户信息字段
 # 用户头像
@@ -42,6 +43,10 @@ DB_PASSWORD = ''
 DB_DATABASE = ''
 DB_CHARSET = ''
 
+# 用户信息缓存大小
+USER_INFO_BUFFER_SIZE = 1000
+
+
 # SQL
 # 未分析 token
 INSERT_TOKEN = 'insert ignore into user_list_cache(user_token) values (%s)'
@@ -49,8 +54,9 @@ SELECT_TOKEN = 'select user_token from user_list_cache limit %s'
 DELETE_TOKEN = 'delete from user_list_cache where user_token = %s'
 COUNT_TOKEN = 'select count(*) from user_list_cache'
 # 已分析 token
-INSERT_ANALYSED_TOKEN = 'insert ignore into analysed_user_list_cache(user_token) values (%s)'
-SELECT_ANALYSED_TOKEN = 'select user_token from analysed_user_list_cache limit %s'
+INSERT_ANALYSED_TOKEN = 'insert ignore into analysed_user_list_cache(user_token, following_count, follower_count) ' \
+                        'values (%s,%s,%s)'
+SELECT_ANALYSED_TOKEN = 'select user_token, following_count, follower_count from analysed_user_list_cache limit %s'
 DELETE_ANALYSED_TOKEN = 'delete from analysed_user_list_cache where user_token = %s'
 COUNT_ANALYSED_TOKEN = 'select count(*) from analysed_user_list_cache'
 
@@ -74,6 +80,8 @@ class DBConnectModule:
                                           db=DB_DATABASE,
                                           charset=DB_CHARSET)
         self.connection_lock = threading.Lock()
+        # 创建用户信息缓存
+        self.user_info_buffer = queue.Queue(USER_INFO_BUFFER_SIZE)
 
     # 销毁数据库连接
     def connection_close(self):
@@ -139,7 +147,7 @@ class DBConnectModule:
         data = cur.fetchone()
         cur.close()
         self.connection_lock.release()
-        return data[0]
+        return data[0] + self.user_info_buffer.qsize()
 
     # 获取指定数目的已分析 token
     def get_analysed_user_token(self, num):
@@ -150,7 +158,9 @@ class DBConnectModule:
         cur.execute(SELECT_ANALYSED_TOKEN, [num])
         token_list = []
         for token in cur.fetchall():
-            token_list.append(token[0])
+            token_list.append([{USER_URL_TOKEN: token[0],
+                                USER_FOLLOWING_COUNT: token[1],
+                                USER_FOLLOWER_COUNT: token[2]}])
         cur.close()
         self.connection_lock.release()
         return token_list
@@ -173,7 +183,9 @@ class DBConnectModule:
         self.connection_lock.acquire()
         cur = self.connection.cursor()
         for token in token_list:
-            cur.execute(INSERT_ANALYSED_TOKEN, [token])
+            cur.execute(INSERT_ANALYSED_TOKEN, [token[USER_URL_TOKEN],
+                                                token[USER_FOLLOWING_COUNT],
+                                                token[USER_FOLLOWER_COUNT]])
         self.connection.commit()
         cur.close()
         self.connection_lock.release()
@@ -190,58 +202,35 @@ class DBConnectModule:
         self.connection_lock.release()
         return data[0]
 
-    # 查询指定 token 对应的用户信息
-    def select_user_info_by_token(self, token):
-        if self.connection is None:
-            return None
-        self.connection_lock.acquire()
-        cur = self.connection.cursor()
-        cur.execute(SELECT_USER_INFO_BY_TOKEN, [token])
-        elem = cur.fetchone()
-        data = None
-        if elem is not None:
-            data = {USER_AVATAR_URL_TEMPLATE: elem[0],
-                    USER_URL_TOKEN: elem[1],
-                    USER_NAME: elem[2],
-                    USER_HEADLINE: elem[3],
-                    USER_LOCATIONS: elem[4],
-                    USER_BUSINESS: elem[5],
-                    USER_EMPLOYMENTS: elem[6],
-                    USER_EDUCATIONS: elem[7],
-                    USER_DESCRIPTION: elem[8],
-                    USER_SINAWEIBO_URL: elem[9],
-                    USER_GENDER: elem[10],
-                    USER_FOLLOWING_COUNT: elem[11],
-                    USER_FOLLOWER_COUNT: elem[12],
-                    USER_ANSWER_COUNT: elem[13],
-                    USER_QUESTION_COUNT: elem[14],
-                    USER_VOTE_UP_COUNT: elem[15]}
-        cur.close()
-        self.connection_lock.release()
-        return data
-
     # 保存用户信息
     def add_user_info(self, user_info):
         if self.connection is None:
             return None
         self.connection_lock.acquire()
-        cur = self.connection.cursor()
-        cur.execute(INSERT_USER_INFO, [user_info[USER_AVATAR_URL_TEMPLATE],
-                                       user_info[USER_URL_TOKEN],
-                                       user_info[USER_NAME],
-                                       user_info[USER_HEADLINE],
-                                       user_info[USER_LOCATIONS],
-                                       user_info[USER_BUSINESS],
-                                       user_info[USER_EMPLOYMENTS],
-                                       user_info[USER_EDUCATIONS],
-                                       user_info[USER_DESCRIPTION],
-                                       # user_info[USER_SINAWEIBO_URL],
-                                       user_info[USER_GENDER],
-                                       user_info[USER_FOLLOWING_COUNT],
-                                       user_info[USER_FOLLOWER_COUNT],
-                                       user_info[USER_ANSWER_COUNT],
-                                       user_info[USER_QUESTION_COUNT],
-                                       user_info[USER_VOTE_UP_COUNT]])
-        self.connection.commit()
-        cur.close()
+        # 若缓存未满则放在缓存中
+        if self.user_info_buffer.qsize() < USER_INFO_BUFFER_SIZE - 1:
+            self.user_info_buffer.put(user_info)
+        else:
+            self.user_info_buffer.put(user_info)
+            cur = self.connection.cursor()
+            for i in range(self.user_info_buffer.qsize()):
+                user_info = self.user_info_buffer.get(block=False)
+                cur.execute(INSERT_USER_INFO, [user_info[USER_AVATAR_URL_TEMPLATE],
+                                               user_info[USER_URL_TOKEN],
+                                               user_info[USER_NAME],
+                                               user_info[USER_HEADLINE],
+                                               user_info[USER_LOCATIONS],
+                                               user_info[USER_BUSINESS],
+                                               user_info[USER_EMPLOYMENTS],
+                                               user_info[USER_EDUCATIONS],
+                                               user_info[USER_DESCRIPTION],
+                                               # user_info[USER_SINAWEIBO_URL],
+                                               user_info[USER_GENDER],
+                                               user_info[USER_FOLLOWING_COUNT],
+                                               user_info[USER_FOLLOWER_COUNT],
+                                               user_info[USER_ANSWER_COUNT],
+                                               user_info[USER_QUESTION_COUNT],
+                                               user_info[USER_VOTE_UP_COUNT]])
+            self.connection.commit()
+            cur.close()
         self.connection_lock.release()

@@ -136,7 +136,7 @@ class ProxyValidateThread(threading.Thread):
                     time.sleep(5)
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
-                log.error(e)
+                log.exception(e)
             self.status = 'error'
 
 
@@ -165,7 +165,7 @@ class ProxyPoolScanThread(threading.Thread):
                     time.sleep(60)
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
-                log.error(e)
+                log.exception(e)
             self.status = 'error'
 
     # 扫描代理池中的代理

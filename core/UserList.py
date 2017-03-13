@@ -91,7 +91,9 @@ class UserTokenCacheQueue:
     def get_token_form_analysed_cache_queue(self):
         if self.analysed_cache_queue.qsize() > 0:
             # 直接从队列中取出
-            return self.analysed_cache_queue.get()
+            token = self.analysed_cache_queue.get()
+            # print(token)
+            return token
         elif self.db_connection.get_analysed_token_num() > 0:
             # 队列为空，先从数据库中取出一部分数据
             temp_list = self.get_analysed_token_from_db(REMAIN_ANALYSED_CACHE_QUEUE_SIZE)

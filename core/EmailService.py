@@ -57,7 +57,7 @@ class EmailService:
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
                 log.error("邮件发送失败")
-                log.error(e)
+                log.exception(e)
             print(e)
 
 
@@ -94,7 +94,7 @@ class EmailServiceThread(threading.Thread):
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
                 log.error("邮件发送失败")
-                log.error(e)
+                log.exception(e)
             self.status = 'error'
 
     @staticmethod
@@ -112,8 +112,8 @@ class EmailServiceThread(threading.Thread):
         # 构建邮件内容
         info_line = '自' + '[' + str(self.lastSendTime.month) + '-' + str(self.lastSendTime.day) + ' ' \
                     + str(self.lastSendTime.hour) + ':' + str(self.lastSendTime.minute) \
-                    + ':' + str(self.lastSendTime.second) + ']' + "以来," + "爬取到新的用户数量为：" + str(total_add) \
-                    + '\n\n\n\n'
+                    + ':' + str(self.lastSendTime.second) + ']' + "以来,\n" + "爬取到新的用户数量为：" + str(total_add) \
+                    + '\n当前爬取到的用户信息总条数为：' + str(current_num) + '\n\n\n\n'
 
         # 获取日志信息
         logging_file = open('logs/ZhiHuSpider.log', encoding='utf8')

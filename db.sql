@@ -33,5 +33,7 @@ CREATE TABLE user_list_cache
 
 CREATE TABLE analysed_user_list_cache
 (
-	user_token varchar(50) primary key
+	user_token varchar(50) primary key,
+    following_count int not null,
+    follower_count int not null
 )ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;

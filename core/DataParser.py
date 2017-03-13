@@ -77,23 +77,31 @@ class CacheQueue:
         return self.user_list_cache_queue.get()
 
 
+# 数据解析模块
 class DataParseModule:
-    def __init__(self, db_connection, user_token_cache_queue, cache_queue):
+    def __init__(self, db_connection, user_token_cache_queue, cache_queue, bloom_filter):
         self.db_connection = db_connection
         self.user_token_cache_queue = user_token_cache_queue
         self.cache_queue = cache_queue
+        self.bloom_filter = bloom_filter
         self.user_info_data_parse_thread = UserInfoDataParserThread(self.db_connection,
-                                                                    self.user_token_cache_queue, self.cache_queue)
+                                                                    self.user_token_cache_queue,
+                                                                    self.cache_queue,
+                                                                    self.bloom_filter)
         self.user_list_data_parse_thread = UserListDataParserThread(self.db_connection,
                                                                     self.user_token_cache_queue, self.cache_queue)
 
     # 启动用户信息数据解析线程
     def start_user_info_data_parse_thread(self):
         self.user_info_data_parse_thread.start()
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("用户信息数据解析线程启动")
 
     # 启动用户列表数据解析线程
     def start_user_list_data_parse_thread(self):
         self.user_list_data_parse_thread.start()
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug('用户列表数据解析线程启动')
 
     def get_user_info_data_parse_thread_status(self):
         return self.user_info_data_parse_thread.status
@@ -103,7 +111,9 @@ class DataParseModule:
 
     def restart_user_info_data_parse_thread(self):
         self.user_info_data_parse_thread = UserInfoDataParserThread(self.db_connection,
-                                                                    self.user_token_cache_queue, self.cache_queue)
+                                                                    self.user_token_cache_queue,
+                                                                    self.cache_queue,
+                                                                    self.bloom_filter)
         self.start_user_info_data_parse_thread()
 
     def restart_user_list_data_parse_thread(self):
@@ -114,15 +124,15 @@ class DataParseModule:
 
 # 用户信息数据解析线程
 class UserInfoDataParserThread(threading.Thread):
-    def __init__(self, db_connection, user_token_cache_queue, cache_queue):
+    def __init__(self, db_connection, user_token_cache_queue, cache_queue, bloom_filter):
         threading.Thread.__init__(self)
         self.user_token_cache_queue = user_token_cache_queue
         self.cache_queue = cache_queue
         self.db_connection = db_connection
+        self.bloom_filter = bloom_filter
         self.status = 'running'
 
     def run(self):
-        # print('用户信息数据解析线程启动!!!')
         try:
             while True:
                 raw_data = None
@@ -142,12 +152,19 @@ class UserInfoDataParserThread(threading.Thread):
                     user_info = self.parse_user_information(raw_data, token)
                     if user_info is not None:
                         if log.isEnabledFor(logging.DEBUG):
-                            log.debug('[' + thread_name + "]搜索到一个用户:" + user_info['name'])
+                            log.debug('[' + thread_name + "]搜索到一个用户:" + user_info[USER_NAME])
+                        # 使用布隆过滤器标记
+                        self.bloom_filter.mark_value(user_info[USER_URL_TOKEN])
                         self.db_connection.add_user_info(self.convert_user_info(user_info))
-                        self.user_token_cache_queue.add_token_into_analysed_cache_queue([token])
+                        # 封装代分析用户关注列表的token信息
+                        token_info = {USER_URL_TOKEN: user_info[USER_URL_TOKEN],
+                                      USER_FOLLOWING_COUNT: user_info[USER_FOLLOWING_COUNT],
+                                      USER_FOLLOWER_COUNT: user_info[USER_FOLLOWER_COUNT]}
+                        # print(token_info)
+                        self.user_token_cache_queue.add_token_into_analysed_cache_queue([token_info])
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
-                log.error(e)
+                log.exception(e)
             self.status = 'error'
 
     # 解析 html 中的知乎用户信息
@@ -326,7 +343,6 @@ class UserListDataParserThread(threading.Thread):
         self.status = 'running'
 
     def run(self):
-        # print('用户列表数据分析线程启动!!!')
         try:
             while True:
                 raw_data = None
@@ -349,7 +365,7 @@ class UserListDataParserThread(threading.Thread):
                         self.user_token_cache_queue.add_token_into_cache_queue(token_list)
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
-                log.error(e)
+                log.exception(e)
             self.status = 'error'
 
     # 解析 html 中的用户列表

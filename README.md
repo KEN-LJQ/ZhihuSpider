@@ -37,6 +37,7 @@
 - requests——一个非常好用的请求库，http://docs.python-requests.org/en/master/
 - pymysql——python 与 MySQL 连接，https://github.com/PyMySQL/PyMySQL
 - BeautifulSoup——简单但是强大的网页文档解析库，https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+- BitVector
 
 
 
@@ -171,7 +172,7 @@
 # 默认关注与被关注列表每页的大小（知乎目前是20条一页）
 pageSize = 20
 # 爬虫动作时间间隔（单位：秒）
-scrapeTimeInterval = 2
+scrapeTimeInterval = 3
 # 正在关注页面时最大爬取页面范围(若为负数则代表不作限制)
 followingPageMax = 200
 # 关注着页面最大爬取页面范围(若为负数则代表不作限制)
@@ -181,9 +182,9 @@ analyseFollowingList = 1
 # 是否分析关注者列表(1代表是，0代表否)
 analyse_FollowerList = 1
 # 用户信息抓取线程数量
-userInfoScrapeThreadNum = 1
+userInfoScrapeThreadNum = 8
 # 用户列表抓取线程数量
-userListScrapeThreadNum = 1
+userListScrapeThreadNum = 8
 # 是否使用代理(1代表是，0代表否)
 isProxyEnable = 1
 
@@ -197,40 +198,42 @@ responseErrorRetryTimes = 5
 connectTimeout = 30
 
 # 已分析用户信息的用户 token 缓存列表大小
-maxAnalysedCacheQueueSize = 1000
+maxAnalysedCacheQueueSize = 3000
 # 已分析用户信息的缓存列表保留大小
 remainAnalysedCacheQueueSize = 100
 # 未分析用户信息的用户 token 缓存列表大小
-maxCacheQueueSize = 1000
+maxCacheQueueSize = 3000
 # 未分析用户信息的用户 token 缓存列表保留大小
 remainCacheQueueSize = 100
 
 # 数据库配置
 dbHost = localhost
 dbUsername = root
-dbPassword = xxx
+dbPassword = XXX
 dbDatabase = zhihu_spider
 dbCharset = utf8
+# 数据库用户信息保存缓存大小
+user_info_buffer_size = 1000
 
 # 爬虫起始token
 startToken =
 
 
 # 发送Email设置
-# 是否启用邮件通知(1代表是，0代表否,默认否)
-isEmailNotificationEnable = 1
+# 是否启用邮件通知(1代表是，0代表否)
+isEmailNotificationEnable = 0
 # SMTP邮件服务器域名
 smtpServerHost = smtp.mxhichina.com
 # SMTP邮件服务器端口
 smtpServerPort = 25
 # SMTP邮件服务器登陆密码
-smtpServerPassword = xxx
+smtpServerPassword = XXX
 # 邮件发送人地址
-smtpFromAddr = xxx
+smtpFromAddr = centosserver@ken-ljq.xyz
 # 邮件接收人地址
-smtpToAddr = xxx
+smtpToAddr = ljq1120799726@outlook.com
 # 邮件标题
-smtpEmailHeader = xxx
+smtpEmailHeader = ZhiZhuSpiderNotification
 # 邮件发送间隔(单位：秒)
 smtpSendInterval = 3600
 ```
