@@ -1,91 +1,125 @@
+import datetime
 import threading
-import time
+import smtplib
 import logging
+import time
 from email.header import Header
 from email.mime.text import MIMEText
-import smtplib
-import datetime
-from core.Logger import log
-
-SMTP_SERVER_HOST = ''
-SMTP_SERVER_PORT = 25
-SMTP_SERVER_PASSWORD = ''
-SMTP_FROM_ADDR = ''
-SMTP_TO_ADDR = ''
-SMTP_EMAIL_HEADER = ''
-SMTP_SEND_INTERVAL = 3600
+from Core.Logger import log
 
 
 class EmailService:
-    def __init__(self, db_connection):
-        self.db_connection = db_connection
+    __slots__ = ('data_persistent', 'smtp_server_host', 'smtp_server_port', 'smtp_server_password',
+                 'smtp_from_addr', 'smtp_to_addr', 'smtp_email_header', 'smtp_send_interval', 'email_service_thread')
+
+    def __init__(self, smtp_server_host, smtp_server_port, smtp_server_password,
+                 smtp_from_addr, smtp_to_addr, smtp_email_header, smtp_send_interval, data_persistent):
+        self.data_persistent = data_persistent
+        # 设置参数
+        self.smtp_server_host = smtp_server_host
+        self.smtp_server_port = smtp_server_port
+        self.smtp_server_password = smtp_server_password
+        self.smtp_from_addr = smtp_from_addr
+        self.smtp_to_addr = smtp_to_addr
+        self.smtp_email_header = smtp_email_header
+        self.smtp_send_interval = smtp_send_interval
+
         # 创建邮件定时发送线程
-        self.email_service_thread = EmailServiceThread(self.db_connection)
+        self.email_service_thread = EmailServiceThread(self.smtp_server_host,
+                                                       self.smtp_server_port,
+                                                       self.smtp_server_password,
+                                                       self.smtp_from_addr,
+                                                       self.smtp_to_addr,
+                                                       self.smtp_email_header,
+                                                       self.smtp_send_interval,
+                                                       self.data_persistent)
+
+        if log.isEnabledFor(logging.INFO):
+            log.info('EmailService 模块初始化完毕')
 
     # 启动邮件定时发送线程
-    def start_email_notification_service(self):
+    def start_email_service(self):
         # 启动线程
         self.email_service_thread.start()
 
-    # 获取线程状态
-    def get_email_notification_service_status(self):
-        return self.email_service_thread.status
+        if log.isEnabledFor(logging.INFO):
+            log.info('EmailService 模块启动')
 
-    # 重启邮件服务线程
-    def restart_email_notification_service(self):
-        self.email_service_thread = EmailServiceThread(self.db_connection)
-        self.email_service_thread.start()
+    def check_and_restart(self):
+        if self.email_service_thread.thread_status == 'error':
+            self.email_service_thread = EmailServiceThread(self.smtp_server_host,
+                                                           self.smtp_server_port,
+                                                           self.smtp_server_password,
+                                                           self.smtp_from_addr,
+                                                           self.smtp_to_addr,
+                                                           self.smtp_email_header,
+                                                           self.smtp_send_interval,
+                                                           self.data_persistent)
+            self.email_service_thread.start()
+            if log.isEnabledFor(logging.INFO):
+                log.info('EmailService线程重新启动')
 
     # 发送指定的内容
-    @staticmethod
-    def send_message(email_content):
+    def send_message(self, email_content):
         # 准备发送的内容
         now = datetime.datetime.now()
-        header = SMTP_EMAIL_HEADER + '[' + str(now.month) + '-' + str(now.day) + ' ' + \
-                 str(now.hour) + ':' + str(now.minute) + ':' + str(now.second) + ']'
+        header = self.smtp_email_header + '[' + str(now.month) + '-' + str(now.day) + ' ' + \
+            str(now.hour) + ':' + str(now.minute) + ':' + str(now.second) + ']'
         msg = MIMEText(email_content, 'plain', 'utf-8')
-        msg['from'] = SMTP_FROM_ADDR
-        msg['to'] = SMTP_TO_ADDR
+        msg['from'] = self.smtp_from_addr
+        msg['to'] = self.smtp_to_addr
         msg['Subject'] = Header(header, 'utf-8').encode()
 
         # 发送
         try:
-            smtp_server = smtplib.SMTP(SMTP_SERVER_HOST, SMTP_SERVER_PORT)
-            smtp_server.login(SMTP_FROM_ADDR, SMTP_SERVER_PASSWORD)
-            smtp_server.sendmail(SMTP_FROM_ADDR, [SMTP_TO_ADDR], msg.as_string())
+            smtp_server = smtplib.SMTP(self.smtp_server_host, self.smtp_server_port)
+            smtp_server.login(self.smtp_from_addr, self.smtp_server_password)
+            smtp_server.sendmail(self.smtp_from_addr, [self.smtp_to_addr], msg.as_string())
             smtp_server.quit()
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
                 log.error("邮件发送失败")
                 log.exception(e)
-            print(e)
 
 
 class EmailServiceThread(threading.Thread):
-    def __init__(self, db_connection):
+    def __init__(self, smtp_server_host, smtp_server_port, smtp_server_password,
+                 smtp_from_addr, smtp_to_addr, smtp_email_header, smtp_send_interval, data_persistent):
         threading.Thread.__init__(self)
-        self.db_connection = db_connection
-        self.status = 'running'
+        self.data_persistent = data_persistent
+        # 设置参数
+        self.smtp_server_host = smtp_server_host
+        self.smtp_server_port = smtp_server_port
+        self.smtp_server_password = smtp_server_password
+        self.smtp_from_addr = smtp_from_addr
+        self.smtp_to_addr = smtp_to_addr
+        self.smtp_email_header = smtp_email_header
+        self.smtp_send_interval = smtp_send_interval
+        # 线程状态
+        self.thread_status = 'working'
+        # 持久化队列名称
+        self.persistent_cache = 'persistentCache'
+
         self.lastSendTime = datetime.datetime.now()
-        self.lastUserInfoNum = db_connection.get_user_info_num()
+        self.lastUserInfoNum = self.data_persistent.get_current_user_info_num()
 
     def run(self):
         if log.isEnabledFor(logging.DEBUG):
             log.debug("邮件服务线程启动")
         try:
             while True:
-                time.sleep(SMTP_SEND_INTERVAL)
+                time.sleep(self.smtp_send_interval)
 
                 # 准备发送的内容
                 msg = MIMEText(self.get_email_content(), 'plain', 'utf-8')
-                msg['from'] = SMTP_FROM_ADDR
-                msg['to'] = SMTP_TO_ADDR
+                msg['from'] = self.smtp_from_addr
+                msg['to'] = self.smtp_to_addr
                 msg['Subject'] = Header(self.get_email_header(), 'utf-8').encode()
 
                 # 发送
-                smtp_server = smtplib.SMTP(SMTP_SERVER_HOST, SMTP_SERVER_PORT)
-                smtp_server.login(SMTP_FROM_ADDR, SMTP_SERVER_PASSWORD)
-                smtp_server.sendmail(SMTP_FROM_ADDR, [SMTP_TO_ADDR], msg.as_string())
+                smtp_server = smtplib.SMTP(self.smtp_server_host, self.smtp_server_port)
+                smtp_server.login(self.smtp_from_addr, self.smtp_server_password)
+                smtp_server.sendmail(self.smtp_from_addr, [self.smtp_to_addr], msg.as_string())
                 smtp_server.quit()
 
                 # 更新最后一次发送时间
@@ -95,17 +129,18 @@ class EmailServiceThread(threading.Thread):
             if log.isEnabledFor(logging.ERROR):
                 log.error("邮件发送失败")
                 log.exception(e)
-            self.status = 'error'
+            self.thread_status = 'error'
 
-    @staticmethod
-    def get_email_header():
+    # 构造邮件标题
+    def get_email_header(self):
         now = datetime.datetime.now()
-        return SMTP_EMAIL_HEADER + '[' + str(now.month) + '-' + str(now.day) + ' ' \
+        return self.smtp_email_header + '[' + str(now.month) + '-' + str(now.day) + ' ' \
             + str(now.hour) + ':' + str(now.minute) + ':' + str(now.second) + ']'
 
+    # 构建邮件内容
     def get_email_content(self):
         # 获得当前用户的数量
-        current_num = self.db_connection.get_user_info_num()
+        current_num = self.data_persistent.get_current_user_info_num()
         total_add = current_num - self.lastUserInfoNum
         self.lastUserInfoNum = current_num
 
@@ -116,7 +151,7 @@ class EmailServiceThread(threading.Thread):
                     + '\n当前爬取到的用户信息总条数为：' + str(current_num) + '\n\n\n\n'
 
         # 获取日志信息
-        logging_file = open('logs/ZhiHuSpider.log', encoding='utf8')
+        logging_file = open('Logs/ZhiHuSpider.log', encoding='utf8')
         logging_info_line = '日志文件信息：\n' + logging_file.read()
         logging_file.close()
 

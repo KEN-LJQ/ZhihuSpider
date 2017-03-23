@@ -1,8 +1,8 @@
-CREATE DATABASE zhihu_spider
+CREATE DATABASE spider_test
 DEFAULT CHARACTER SET utf8
 DEFAULT COLLATE utf8_general_ci;
 
-use zhihu_spider;
+use spider_test;
 
 CREATE TABLE user_info
 (
@@ -16,7 +16,6 @@ CREATE TABLE user_info
     user_employments varchar(100),
     user_educations varchar(100),
     user_description varchar(150),
-    user_sinaweibo_url varchar(50),
     user_gender int,
     user_following_count int,
     user_follower_count int,
@@ -24,16 +23,4 @@ CREATE TABLE user_info
     user_question_count int,
     user_voteup_count int,
     index(user_token)
-)ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;
-
-CREATE TABLE user_list_cache
-(
-	user_token varchar(50) primary key
-)ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;
-
-CREATE TABLE analysed_user_list_cache
-(
-	user_token varchar(50) primary key,
-    following_count int not null,
-    follower_count int not null
 )ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;

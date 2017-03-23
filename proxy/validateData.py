@@ -1,8 +1,7 @@
 import requests
 import re
 import logging
-from proxy import proxyCore
-from core.Logger import log
+from Core.Logger import log
 
 # 代理 IP 验证网站
 url = 'http://icanhazip.com/'
@@ -27,6 +26,7 @@ class DataValidateModule:
 
     # 验证给定的代理 IP 是否有效
     def validate_proxy_ip(self, proxy_ip_info):
+        from Proxy import proxyCore
         if proxy_ip_info is None:
             return False
 

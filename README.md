@@ -1,11 +1,13 @@
+
+
 # Python 知乎用户信息爬虫
 
 
 
 ## 特点
 
-* 无需登陆知乎账号
 * 使用多线程爬取，并可以自行配置使用的线程数目
+* 使用Redis作为任务队列
 * 使用高匿代理IP进行数据的爬取，每一个线程独立一个代理IP，并且失效后会重新分配，避免频繁访问导致本机 IP 被封
 * 可以启用邮件定时通知功能
 
@@ -14,30 +16,21 @@
 ## 运行要求
 
 * Python 版本：3.0 以上
-* 数据库：MySQL
+* 数据库：MySQL、Redis
 
 
 
 
 ## 使用到的库
 
-项目中使用到的一些 Python 自带以及其他的第三方库如下：
-
-###### Python自带：
-
-- time
-- threading
-- re
-- queue
-- html
-- json
+项目中使用到的 Python 第三方库如下：
 
 ###### 第三方库：
 
 - requests——一个非常好用的请求库，http://docs.python-requests.org/en/master/
 - pymysql——python 与 MySQL 连接，https://github.com/PyMySQL/PyMySQL
 - BeautifulSoup——简单但是强大的网页文档解析库，https://www.crummy.com/software/BeautifulSoup/bs4/doc/
-- BitVector
+- Redis-py——Redis Python客户端，[How To Configure a Redis Cluster on CentOS 7](https://www.digitalocean.com/community/tutorials/how-to-configure-a-redis-cluster-on-centos-7)
 
 
 
@@ -53,7 +46,7 @@
 
 ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-8.PNG)
 
-​	用户Token是注册知乎账号是设置的一个非中文昵称，通过其可唯一确定某一个用户。同时由于URL中也是通过该Token区分不同用户的页面，所以我们可以很容易的利用token来爬取
+​	用户Token是注册知乎账号时设置的一个非中文昵称，通过其可唯一确定某一个用户。同时由于URL中也是通过该Token区分不同用户的页面，所以我们可以很容易的利用token来爬取
 
 
 
@@ -61,18 +54,29 @@
 
 爬虫中用到3类URL，分别是：
 
-* 用户主页：
+* 用户与获取用户详细信息：
 
-  ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-4.PNG)
+  ```
+  https://www.zhihu.com/people/excited-vczh/pins
+  ```
+  认为用户详细信息仅仅在加载用户信息页时已经在后端进行渲染一同加载显示，数据放在`id`为`data`的`<div>`标签中的`data-state`属性，目前没有找到可以直接提取数据的接口，所以只能够选择一个数据量较少的页面整个爬取
 
-* 用户正在关注页：
+* 用户正在关注列表信息：
 
-  ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-5.PNG)
+  ```
+  http://www.zhihu.com/api/v4/members/xzer/followees?limit=20&offset=0
+  ```
 
-* 用户关注者页：
+  该URL需要用户登陆后才用权限获取数据，返回的数据格式为JSON，URL的参数：`limit`列表分页大小，`offset`列表分页偏移值
 
-  ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-6.PNG)
+* 用户关注者列表信息：
 
+  ```
+  http://www.zhihu.com/api/v4/members/xzer/followers?limit=20&offset=0
+  ```
+
+
+  该URL需要用户登陆后才用权限获取数据，返回的数据格式为JSON，URL的参数：`limit`列表分页大小，`offset`列表分页偏移值
 
 
 
@@ -105,6 +109,12 @@
 
 
 
+## 结构设计
+
+
+
+![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-7.PNG)
+
 ## 如何运行
 
 1. 安装指定版本的 Python、数据库、以及必须的第三方库
@@ -113,115 +123,113 @@
 
 3. 配置程序中的数据库配置
 
-   1. 打开`spiderConfiguration.conf` 文件，修改用户名以及密码
+   1. 打开`SpiderCoreConfig.conf` 文件，修改MySQL的配置
 
-      ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-1.PNG)
+      ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-1.PNG)
 
-   2. 保存文件
+   2. 在同一个文件下，修改Redis的配置、
+
+      ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-2.PNG)
 
 4. 添加若干个初始的用户 token，程序运行后将会以这个用户开始搜索
 
-   * 方法一：修改`spiderConfiguration.conf`文件中里面的的`startToken` 变量的值为初始的用户token（仅可以一个）
+   1. 修改`SpiderCoreConfig.conf`文件中里面的的`startToken` 变量的值为初始的用户token（可以设置多个）
 
-     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-2.PNG)
+      ```
+      # 初始token（如果有多个初始token， 使用‘,’分隔）
+      initToken = excited-vczh
+      ```
 
-   * 方法二：比较推荐，把这若干个初始用户 token 添加到数据库中`user_list_cache`表中，并保存
+5. 配置数据下载以及数据处理的线程数目
 
-     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A87.png)
+   1. 数据下载线程数目，修改`SpiderCoreConfig.conf`文件中的`downloadThreadNum`，默认为10个线程
 
-5. 配置用户信息抓取以及用户列表抓取使用的线程数
+   ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-4.PNG)
 
-   * 修改`spiderConfiguration.conf`文件中的`userInfoScrapeThreadNum`以及`userListScrapeThreadNum`字段并保存，默认为8个线程
+   2. 数据处理线程数目，修改`SpiderCoreConfig.conf`文件中的`processThreadNum`，默认为3个线程
 
-     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-3.PNG)
+   ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-5.PNG)
 
-6. 若使用的Window平台,打开CMD，打开项目所在的文件夹的根目录
+6. 配置是否使用代理
+
+   1. 使用代理可避免爬虫频繁访问导致IP被屏蔽。修改`SpiderCoreConfig.conf`文件中的`isProxyServiceEnable`，值为`1`代表启动， `0`代表关闭
+
+      ```
+      # 是否启用代理服务(1代表是，0代表否)
+      isProxyServiceEnable = 1
+      ```
+
+7. 知乎账户配置
+
+   1. 配置知乎账户的账号和密码，目前仅支持使用邮箱登陆，最好不要使用自己的主账号
+
+      ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-3.PNG)
+
+8. 日志配置
+
+   1. 可选择将程序运行信息输出到控制台，或者写入到日志文件中，选择哪一种方式在`Logger.py` 文件中配置。而日志级别等具体的设置在`SpiderLoggingConfig.conf`中配置
+
+      ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-6.PNG)
+
+9. 若使用的Window平台,打开CMD，打开项目所在的文件夹的根目录
 
    ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A84.png)
 
-7. 输入`startup.py`运行程序
+10. 输入`startup.py`运行程序
 
-   ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
+  ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
 
-   需要注意的是，CMD的字符集需要设置为utf8，否则可能会出现问题
+  需要注意的是，CMD的字符集需要设置为utf8，否则可能会出现问题
 
-8. 程序开始运行
+11. 程序开始运行
 
-   * 运行截图：
+    * 运行结果
 
-     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A86.png)
-
-   * 运行截图：
-
-     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A88.png)
-
-   * 运行结果
-
-     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E7%88%AC%E5%8F%96%E5%86%85%E5%AE%B9%E4%BB%8B%E7%BB%8D2.png)
+      ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E7%88%AC%E5%8F%96%E5%86%85%E5%AE%B9%E4%BB%8B%E7%BB%8D2.png)
 
 
 
 
 ## 可配置的内容
 
-爬虫的相关参数以及使用的代理的参数均可在配置文件`spiderConfiguration.conf`中设置.具体如下：
+爬虫的相关参数在配置文件`SpiderCore.conf`中设置.具体如下：
 
 ```
-
 [spider_core]
-# 默认关注与被关注列表每页的大小（知乎目前是20条一页）
-pageSize = 20
-# 爬虫动作时间间隔（单位：秒）
-scrapeTimeInterval = 3
-# 正在关注页面时最大爬取页面范围(若为负数则代表不作限制)
-followingPageMax = 200
-# 关注着页面最大爬取页面范围(若为负数则代表不作限制)
-followerPageMax = 100
-# 是否分析正在关注列表(1代表是，0代表否)
-analyseFollowingList = 1
-# 是否分析关注者列表(1代表是，0代表否)
-analyse_FollowerList = 1
-# 用户信息抓取线程数量
-userInfoScrapeThreadNum = 8
-# 用户列表抓取线程数量
-userListScrapeThreadNum = 8
-# 是否使用代理(1代表是，0代表否)
-isProxyEnable = 1
 
-# 每个代理最大请求次数
-proxyUsageMax = 10000
-# 发生网络异常重试次数
-networkReconnectTimes = 3
-# 发生响应异常重试次数
-responseErrorRetryTimes = 5
+# 数据下载配置
+# 是否启用代理服务(1代表是，0代表否)
+isProxyServiceEnable = 1
+# session pool 的大小
+sessionPoolSize = 25
+# 下载线程数量
+downloadThreadNum = 10
+# 网络连接错误重试次数
+networkRetryTimes = 3
 # 网络连接超时（单位：秒）
 connectTimeout = 30
+# 下载间隔
+downloadInterval = 5
 
-# 已分析用户信息的用户 token 缓存列表大小
-maxAnalysedCacheQueueSize = 3000
-# 已分析用户信息的缓存列表保留大小
-remainAnalysedCacheQueueSize = 100
-# 未分析用户信息的用户 token 缓存列表大小
-maxCacheQueueSize = 3000
-# 未分析用户信息的用户 token 缓存列表保留大小
-remainCacheQueueSize = 100
+# 数据处理配置
+# 数据处理线程数量
+processThreadNum = 3
+# 是否解析following列表（通过用户的正在关注列表获取下一批需要分析的token）
+isParserFollowingList = 1
+# 是否解析follower列表（通过用户的关注者列表获取下一批需要分析的token）
+isParserFollowerList = 0
 
-# 数据库配置
-dbHost = localhost
-dbUsername = root
-dbPassword = XXX
-dbDatabase = zhihu_spider
-dbCharset = utf8
-# 数据库用户信息保存缓存大小
-user_info_buffer_size = 1000
+# URL调度配置
+# 用户信息下载和用户关注列表下载URL比例（用户信息URL / URL总数， 例如：值为8，代表每次调度中80%是用户信息URL）
+urlRate = 8
 
-# 爬虫起始token
-startToken =
+# 数据持久化配置
+# 数据库写缓存大小（记录条数）
+persistentCacheSize = 100
 
-
-# 发送Email设置
+# 邮件服务配置
 # 是否启用邮件通知(1代表是，0代表否)
-isEmailNotificationEnable = 0
+isEmailServiceEnable = 1
 # SMTP邮件服务器域名
 smtpServerHost = smtp.mxhichina.com
 # SMTP邮件服务器端口
@@ -235,8 +243,30 @@ smtpToAddr = ljq1120799726@outlook.com
 # 邮件标题
 smtpEmailHeader = ZhiZhuSpiderNotification
 # 邮件发送间隔(单位：秒)
-smtpSendInterval = 3600
+smtpSendInterval = 14400
+
+# Redis 数据库配置
+redisHost = localhost
+redisPort = 6379
+redisDB = 1
+redisPassword = XXX
+
+# MySQL 数据库配置
+mysqlHost = localhost
+mysqlUsername = root
+mysqlPassword = XXX
+mysqlDatabase = spider_test
+mysqlCharset = utf8
+
+# 知乎账号配置
+loginToken = handsome@ken-ljq.xyz
+password = XXX
+
+# 初始token（如果有多个初始token， 使用‘,’分隔）
+initToken = excited-vczh
 ```
+
+代理模块参数在配置文件`proxyConfiguration.conf`中设置.具体如下：
 
 ```
 
@@ -261,6 +291,7 @@ proxyCore_proxyPoolSize = 10
 proxyCore_proxyPoolScanInterval = 300
 # 代理验证线程数量
 proxyCore_proxyValidateThreadNum = 5
+
 ```
 
 

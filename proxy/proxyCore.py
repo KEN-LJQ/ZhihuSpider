@@ -1,7 +1,7 @@
-from proxy import validateData
-from proxy import fetchData
-from proxy import parseData
-from core.Logger import log
+from Proxy import validateData
+from Proxy import fetchData
+from Proxy import parseData
+from Core.Logger import log
 import time
 import threading
 import queue
@@ -88,7 +88,7 @@ class ProxyDaemonThread(threading.Thread):
     def init():
         section = "proxy_core"
         config = configparser.ConfigParser()
-        config.read('proxy/proxyConfiguration.conf', encoding='utf8')
+        config.read('Proxy/Config/proxyConfiguration.conf', encoding='utf8')
 
         # validateData配置
         validateData.CONNECT_TIMEOUT = int(config.get(section, "proxyValidate_connectTimeout"))
@@ -196,12 +196,14 @@ class ProxyPoolScanThread(threading.Thread):
 
 class ProxyService:
     def __init__(self):
-        proxy_daemon_thread = ProxyDaemonThread()
-        proxy_daemon_thread.start()
+        self.proxy_daemon_thread = ProxyDaemonThread()
 
     @staticmethod
     def get_proxy():
         return proxy_pool.get()
+
+    def start_proxy_service(self):
+        self.proxy_daemon_thread.start()
 
 
 # if __name__ == '__main__':

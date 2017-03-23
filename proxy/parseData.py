@@ -1,5 +1,4 @@
 from bs4 import BeautifulSoup
-from proxy import proxyCore
 
 
 class DataParseModule:
@@ -9,6 +8,7 @@ class DataParseModule:
     # 解析 DOM 内容
     @staticmethod
     def parse_data(data):
+        from Proxy import proxyCore
         # 存放解析出来代理信息
         proxy_ip_list = []
 

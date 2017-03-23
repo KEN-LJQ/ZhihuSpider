@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
-import core.ScrapeCore as ScrapeCore
+from Core.SpiderCore import SpiderCore
 
-# 知乎爬虫启动
 if __name__ == '__main__':
-    spider = ScrapeCore.SpiderCore()
-    spider.start_spider()
+    spider_core = SpiderCore()
+    spider_core.start_spider_core()
