@@ -16,14 +16,26 @@ loginURL = 'https://www.zhihu.com/login/email'
 
 mainPageURL = 'https://www.zhihu.com'
 
+authTestURL = 'https://www.zhihu.com/api/v4/members/xzer/followers?offset=0&limit=20'
+
 
 # 用户账号登陆模块
 class AccountManager:
-    __slots__ = ('login_token', 'password', 'auth_token')
+    __slots__ = ('login_token', 'password', 'auth_token', 'is_login_by_cookie', 'q_c1', 'r_cap_id', 'cap_id', 'z_c0')
 
-    def __init__(self, login_token, password):
+    def __init__(self, login_token, password, is_login_by_cookie, q_c1, r_cap_id, cap_id, z_c0):
+        # 登陆方式
+        self.is_login_by_cookie = is_login_by_cookie
+
+        # 普通登陆信息
         self.login_token = login_token
         self.password = password
+
+        # Cookie 登陆信息
+        self.q_c1 = q_c1
+        self.r_cap_id = r_cap_id
+        self.cap_id = cap_id
+        self.z_c0 = z_c0
 
         # 登陆凭证（Cookies）
         self.auth_token = None
@@ -32,8 +44,43 @@ class AccountManager:
     def get_auth_token(self):
         return self.auth_token
 
-    # 登陆
     def login(self):
+        if self.is_login_by_cookie is True:
+            return self.cookie_login()
+        else:
+            return self.common_login()
+
+    # Cookie 登陆方式
+    def cookie_login(self):
+        # 创建会话
+        session = requests.session()
+        session.headers = requestHeader
+
+        # 获取基本的cookie
+        session.get(mainPageURL)
+
+        # 添加用户配置的认证Cookie
+        cookie = {'q_c1': self.q_c1,
+                  'r_cap_id': self.r_cap_id,
+                  'cap_id': self.cap_id,
+                  'z_c0': self.z_c0}
+        session.cookies.update(cookie)
+
+        # 检验是否成功登陆
+        response = session.get(authTestURL)
+        if response.status_code == 200:
+            # 保存已经被认证Cookie
+            self.auth_token = session.cookies.get_dict()
+            if log.isEnabledFor(logging.INFO):
+                log.info('知乎账户登陆成功')
+            return True
+        else:
+            if log.isEnabledFor(logging.INFO):
+                log.info('知乎账户登陆失败')
+            return False
+
+    # 普通登陆方式
+    def common_login(self):
         # 创建会话
         session = requests.session()
         session.headers = requestHeader
@@ -54,16 +101,19 @@ class AccountManager:
             session.headers = requestHeader
             response = session.post(url=loginURL, data=form_data)
             if response.status_code == 200:
-                # 保存登陆认证cookie
-                self.auth_token = session.cookies.get_dict()
+                # 检查是否已经登陆成功
+                response = session.get(authTestURL)
+                if response.status_code == 200:
+                    # 保存登陆认证cookie
+                    self.auth_token = session.cookies.get_dict()
+                    if log.isEnabledFor(logging.INFO):
+                        log.info('知乎账户登陆成功')
+                    return True
 
-                if log.isEnabledFor(logging.INFO):
-                    log.info('知乎账户登陆成功')
-                return True
-            else:
-                if log.isEnabledFor(logging.INFO):
-                    log.info('知乎账户登陆失败')
-                return False
+            # 登陆失败
+            if log.isEnabledFor(logging.INFO):
+                log.info('知乎账户登陆失败')
+            return False
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
                 log.error(e)

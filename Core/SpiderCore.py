@@ -60,6 +60,11 @@ class SpiderCore:
         self.mysql_charset = 'utf8'
 
         # 知乎账户配置
+        self.is_login_by_cookie = True
+        self.q_c1 = ''
+        self.r_cap_id = ''
+        self.cap_id = ''
+        self.z_c0 = ''
         self.login_token = ''
         self.password = ''
 
@@ -125,7 +130,13 @@ class SpiderCore:
         self.response_buffer = ResponseBuffer()
 
         # 启动账户管理器并登陆
-        self.account_manager = AccountManager(self.login_token, self.password)
+        self.account_manager = AccountManager(self.login_token,
+                                              self.password,
+                                              self.is_login_by_cookie,
+                                              self.q_c1,
+                                              self.r_cap_id,
+                                              self.cap_id,
+                                              self.z_c0)
         self.account_manager.login()
 
         # 启动Downloader
@@ -225,6 +236,11 @@ class SpiderCore:
         self.mysql_charset = config.get(section, 'mysqlCharset')
 
         # 读取知乎账户配置
+        self.is_login_by_cookie = True if int(config.get(section, 'isLoginByCookie')) == 1 else False
+        self.q_c1 = config.get(section, 'q_c1')
+        self.r_cap_id = config.get(section, 'r_cap_id')
+        self.cap_id = config.get(section, 'cap_id')
+        self.z_c0 = config.get(section, 'z_c0')
         self.login_token = config.get(section, 'loginToken')
         self.password = config.get(section, 'password')
 

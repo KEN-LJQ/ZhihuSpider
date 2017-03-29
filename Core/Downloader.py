@@ -234,6 +234,9 @@ class DownloadThread(threading.Thread):
                     # 下载数据
                     response = session.get(url, timeout=self.CONNECT_TIMEOUT)
 
+                    if log.isEnabledFor(logging.DEBUG):
+                        log.debug(response.status_code)
+
                     # 检查返回结果
                     if response.status_code == 200:
                         # 封装下载的数据(包括原来的数据)
@@ -241,6 +244,8 @@ class DownloadThread(threading.Thread):
                         response_info[1] = response.text
                         self.put_response_info_to_queue(response_info)
                         previous_url_info = None
+                        if log.isEnabledFor(logging.DEBUG):
+                            log.debug('下载了一个网页')
                         break
                     elif response.status_code == 429:
                         if log.isEnabledFor(logging.DEBUG):

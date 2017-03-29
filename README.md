@@ -161,7 +161,20 @@
 
 7. 知乎账户配置
 
-   1. 配置知乎账户的账号和密码，目前仅支持使用邮箱登陆，最好不要使用自己的主账号
+   1. 配置登陆方式。设定配置文件的`isLoginByCookie`字段， 若值为`1`则使用Cookie方式登陆，若为`1`则使用普通方式（邮箱或手机号码）登陆
+
+      ```
+      # 是否使用Cookie登陆
+      isLoginByCookie = 1
+      ```
+
+   2. 配置登陆认证信息。以下两种登陆方式
+
+      1. Cookie登陆方式。首先使用PC浏览器手动登陆知乎账号，然后从浏览器中将登陆成功后的Cookie配置到爬虫配置文件中。配置的cookie包括：`q_c1`, `r_cap_id`,`cap_id`, `z_c0`。
+
+      ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-29/spider-1.PNG)
+
+      2. 普通方式。（当前不可用）配置知乎账户的账号和密码，最好不要使用自己的主账号（目前知乎的邮箱登陆和手机号码登陆方式均需要输入普通验证码或选择倒转文字验证码， 还没有解决）
 
       ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-3.PNG)
 
@@ -177,9 +190,9 @@
 
 10. 输入`startup.py`运行程序
 
-  ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
+ ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
 
-  需要注意的是，CMD的字符集需要设置为utf8，否则可能会出现问题
+ 需要注意的是，CMD的字符集需要设置为utf8，否则可能会出现问题
 
 11. 程序开始运行
 

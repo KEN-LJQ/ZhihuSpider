@@ -344,7 +344,8 @@ class ProcessThread(threading.Thread):
 
         # 标记并保存提取到的用户信息
         self.token_filter.mark_token(token)
-        # log.info('添加了一个新的用户')
+        if log.isEnabledFor(logging.DEBUG):
+            log.info('成功获取一个用户的详细信息')
         self.redis_connection.rpush(self.persistent_cache, user_info_entities)
 
     # 解析follower & following 信息
