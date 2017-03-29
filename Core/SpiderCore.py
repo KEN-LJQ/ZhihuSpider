@@ -89,8 +89,10 @@ class SpiderCore:
             # 创建Redis连接
             redis_connect_retry_times = 3
             while redis_connect_retry_times > 0:
-                self.redis_connection = redis.StrictRedis(host='139.199.179.164', port=6379, db=1,
-                                                          password='Ljq20110627,.')
+                self.redis_connection = redis.StrictRedis(host=self.redis_host,
+                                                          port=self.redis_port,
+                                                          db=self.redis_db,
+                                                          password=self.redis_password)
                 ping = self.redis_connection.ping()
                 if ping is True:
                     if log.isEnabledFor(logging.INFO):
