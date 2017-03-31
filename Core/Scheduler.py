@@ -28,7 +28,7 @@ class Scheduler(threading.Thread):
     def run(self):
 
         if log.isEnabledFor(logging.INFO):
-            log.info('Scheduler 模块启动')
+            log.info('Scheduler 模块启动成功')
 
         while True:
             # 当 urlQueue 队列中元素太多时，停止放入

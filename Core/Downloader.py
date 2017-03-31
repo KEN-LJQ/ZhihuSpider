@@ -46,7 +46,7 @@ class SessionManager:
             self.proxy_service.start_proxy_service()
 
         if log.isEnabledFor(logging.INFO):
-            log.info("Session Manager 启动")
+            log.info("Session Manager 启动成功")
 
     # 创建包含代理信息的 session
     def create_session_proxy(self, proxy_info):
@@ -151,16 +151,16 @@ class Downloader:
             self.download_thread_list.append(download_thread)
 
         if log.isEnabledFor(logging.INFO):
-            log.info("Downloader 初始化完毕")
+            log.info("Downloader 模块初始化完毕")
 
     # 启动
     def start_downloader(self):
-        if log.isEnabledFor(logging.INFO):
-            log.info('Downloader 启动')
-
         # 启动下载线程
         for download_thread in self.download_thread_list:
             download_thread.start()
+
+        if log.isEnabledFor(logging.INFO):
+            log.info('Downloader 模块启动成功')
 
     # 检查并重启线程
     def check_and_restart(self):
@@ -207,8 +207,8 @@ class DownloadThread(threading.Thread):
         self.DOWNLOAD_INTERVAL = download_interval
 
     def run(self):
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug('数据下载线程' + self.thread_id + '启动')
+        if log.isEnabledFor(logging.INFO):
+            log.info('数据下载线程' + self.thread_id + '启动')
 
         # 初次启动，阻塞至获取足够的代理
         self.session_manager.init_get()
@@ -245,7 +245,11 @@ class DownloadThread(threading.Thread):
                         self.put_response_info_to_queue(response_info)
                         previous_url_info = None
                         if log.isEnabledFor(logging.DEBUG):
-                            log.debug('下载了一个网页')
+                            log.debug('下载成功')
+                        break
+                    elif response.status_code == 403:
+                        if log.isEnabledFor(logging.ERROR):
+                            log.error('账号认证失败')
                         break
                     elif response.status_code == 429:
                         if log.isEnabledFor(logging.DEBUG):
@@ -258,6 +262,8 @@ class DownloadThread(threading.Thread):
                         del url_info
                         break
                     else:
+                        if log.isEnabledFor(logging.ERROR):
+                            log.error(response.status_code)
                         network_retry_times += 1
                 except Exception as e:
                     network_retry_times += 1

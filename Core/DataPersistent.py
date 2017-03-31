@@ -35,21 +35,33 @@ USER_QUESTION_COUNT = 'questionCount'
 # 用户获得赞同的数目
 USER_VOTE_UP_COUNT = 'voteupCount'
 
+# 关注关系字段
+# 关注者
+FOLLOW_FROM = 'followFrom'
+# 被关注者
+FOLLOW_TO = 'followTo'
+
 
 # 负责用户数据的持久化
 class DataPersistent:
-    __slots__ = ('persistent_cache_size', 'db_connection', 'redis_connection', 'persistent_thread')
+    __slots__ = ('persistent_cache_size', 'db_connection', 'redis_connection', 'persistent_thread',
+                 'follow_relation_persistent_cache_size')
 
     # 初始化
-    def __init__(self, persistent_cache_size, db_connection, redis_connection):
-        # 设置数据持久化缓存大小
+    def __init__(self, persistent_cache_size, follow_relation_persistent_cache_size, db_connection, redis_connection):
+        # 设置用户信息数据持久化缓存大小
         self.persistent_cache_size = persistent_cache_size
+        # 设置用户关注关系持久化缓存大小
+        self.follow_relation_persistent_cache_size = follow_relation_persistent_cache_size
         # 设置数据库连接
         self.db_connection = db_connection
         # 设置Redis连接
         self.redis_connection = redis_connection
         # 创建数据库持久化线程
-        self.persistent_thread = PersistentThread(self.db_connection, self.redis_connection, self.persistent_cache_size)
+        self.persistent_thread = PersistentThread(self.db_connection,
+                                                  self.redis_connection,
+                                                  self.persistent_cache_size,
+                                                  self.follow_relation_persistent_cache_size)
 
         if log.isEnabledFor(logging.INFO):
             log.info('DataPersistent 模块初始化完毕')
@@ -59,7 +71,6 @@ class DataPersistent:
 
     # 启动DataPersistent模块
     def start_data_persistent(self):
-        # log.info('DataPersistent 模块启动成功')
         # 启动线程
         self.persistent_thread.start()
 
@@ -70,33 +81,42 @@ class DataPersistent:
     def check_and_restart(self):
         if self.persistent_thread.thread_status == 'error':
             self.persistent_thread = PersistentThread(self.db_connection, self.redis_connection,
-                                                      self.persistent_cache_size)
+                                                      self.persistent_cache_size,
+                                                      self.follow_relation_persistent_cache_size)
             self.persistent_thread.start()
             if log.isEnabledFor(logging.INFO):
                 log.info('DataPersistent模块持久化线程中重新启动')
 
 
-# 数据插入SQL语句
+# 用户信息数据插入SQL语句
 INSERT_USER_INFO = 'insert ignore into user_info(user_avator_url, user_token, user_name, user_headline, ' \
                    'user_location, user_business, user_employments, user_educations, user_description, ' \
                    'user_gender, user_following_count, user_follower_count, user_answer_count, ' \
                    'user_question_count, user_voteup_count) values(%s,%s,%s,%s,%s,%s,%s,%s,' \
                    '%s,%s,%s,%s,%s,%s,%s)'
-# 数据数量查询语句
+
+# 用户关注关系数据插入SQL语句
+INSERT_FOLLOW_RELATION = 'insert ignore into follow_relation(follow_from, follow_in) values(%s, %s)'
+
+# 用户信息数量查询语句
 COUNT_USER_INFO = 'select count(*) from user_info'
 
 
 class PersistentThread(threading.Thread):
-    def __init__(self, db_connection, redis_connection, persistent_cache_size):
+    def __init__(self, db_connection, redis_connection, persistent_cache_size, follow_relation_persistent_cache_size):
         threading.Thread.__init__(self)
         # 设置数据库连接
         self.db_connection = db_connection
         # 设置Redis连接
         self.redis_connection = redis_connection
-        # 设置缓存大小
+        # 设置用户信息缓存大小
         self.persistent_cache_size = persistent_cache_size
+        # 设置关注关系缓存大小
+        self.follow_relation_persistent_cache_size = follow_relation_persistent_cache_size
         # 数据持久化缓存队列名称
         self.persistent_cache = 'persistentCache'
+        # 关注关系持久化缓存队列名称
+        self.follow_relation_persistent_cache = 'followRelationPersistentCache'
         # 线程状态
         self.thread_status = 'working'
         # Operation Lock
@@ -120,10 +140,12 @@ class PersistentThread(threading.Thread):
         debug_info = None
         try:
             while True:
-                current_cache_size = self.redis_connection.llen(self.persistent_cache)
-                if current_cache_size >= self.persistent_cache_size:
+                # 持久化用户信息
+                current_user_info_cache_size = self.redis_connection.llen(self.persistent_cache)
+                if current_user_info_cache_size >= self.persistent_cache_size:
+                    self.lock.acquire()
                     cursor = self.db_connection.cursor()
-                    for i in range(current_cache_size):
+                    for i in range(current_user_info_cache_size):
                         user_info = self.redis_connection.lpop(self.persistent_cache)
                         debug_info = user_info
                         if user_info is not None:
@@ -145,6 +167,23 @@ class PersistentThread(threading.Thread):
                                                               user_info[USER_VOTE_UP_COUNT]])
                     self.db_connection.commit()
                     cursor.close()
+                    self.lock.release()
+
+                # 持久化关注关系
+                current_follow_relation_cache_size = self.redis_connection.llen(self.follow_relation_persistent_cache)
+                if current_follow_relation_cache_size >= self.follow_relation_persistent_cache_size:
+                    self.lock.acquire()
+                    cursor = self.db_connection.cursor()
+                    for i in range(current_follow_relation_cache_size):
+                        follow_relation = self.redis_connection.lpop(self.follow_relation_persistent_cache)
+                        debug_info = follow_relation
+                        if follow_relation is not None:
+                            follow_relation = eval(follow_relation.decode('utf-8'))
+                            cursor.execute(INSERT_FOLLOW_RELATION, [follow_relation[FOLLOW_FROM],
+                                                                    follow_relation[FOLLOW_TO]])
+                    self.db_connection.commit()
+                    cursor.close()
+                    self.lock.release()
 
                 # 检查时间间隔
                 time.sleep(180)

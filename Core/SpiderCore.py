@@ -35,6 +35,7 @@ class SpiderCore:
 
         # DataPersistent 模块配置
         self.persistent_cache_size = 1000
+        self.follow_relation_persistent_cache_size = 1000
 
         # 邮件服务配置
         self.is_email_service_enable = False
@@ -61,9 +62,6 @@ class SpiderCore:
 
         # 知乎账户配置
         self.is_login_by_cookie = True
-        self.q_c1 = ''
-        self.r_cap_id = ''
-        self.cap_id = ''
         self.z_c0 = ''
         self.login_token = ''
         self.password = ''
@@ -133,17 +131,19 @@ class SpiderCore:
         self.account_manager = AccountManager(self.login_token,
                                               self.password,
                                               self.is_login_by_cookie,
-                                              self.q_c1,
-                                              self.r_cap_id,
-                                              self.cap_id,
                                               self.z_c0)
         self.account_manager.login()
 
         # 启动Downloader
-        self.downloader = Downloader(self.redis_connection, self.response_buffer, self.account_manager,
+        self.downloader = Downloader(self.redis_connection,
+                                     self.response_buffer,
+                                     self.account_manager,
                                      self.is_proxy_service_enable,
-                                     self.session_pool_size, self.download_thread_num, self.network_retry_times,
-                                     self.connect_timeout, self.download_interval)
+                                     self.session_pool_size,
+                                     self.download_thread_num,
+                                     self.network_retry_times,
+                                     self.connect_timeout,
+                                     self.download_interval)
         self.downloader.start_downloader()
 
         # 启动Scheduler
@@ -151,20 +151,31 @@ class SpiderCore:
         self.schedule.start()
 
         # 启动 DataPersistent
-        self.dataPersistent = DataPersistent(self.persistent_cache_size, self.mysql_connection, self.redis_connection)
+        self.dataPersistent = DataPersistent(self.persistent_cache_size,
+                                             self.follow_relation_persistent_cache_size,
+                                             self.mysql_connection,
+                                             self.redis_connection)
         self.dataPersistent.start_data_persistent()
 
         # 启动Processor
-        self.processor = Processor(self.process_thread_num, self.is_parser_following_list,
-                                   self.is_parser_follower_list, self.redis_connection, self.response_buffer)
+        self.processor = Processor(self.process_thread_num,
+                                   self.is_parser_following_list,
+                                   self.is_parser_follower_list,
+                                   self.redis_connection,
+                                   self.response_buffer)
         self.processor.start_processor()
         self.processor.load_init_data(self.init_token)
 
         # 启动邮件服务
         if self.is_email_service_enable is True:
-            self.email_service = EmailService(self.smtp_server_host, self.smtp_server_port, self.smtp_server_password,
-                                              self.smtp_from_addr, self.smtp_to_addr, self.smtp_email_header,
-                                              self.smtp_send_interval, self.dataPersistent)
+            self.email_service = EmailService(self.smtp_server_host,
+                                              self.smtp_server_port,
+                                              self.smtp_server_password,
+                                              self.smtp_from_addr,
+                                              self.smtp_to_addr,
+                                              self.smtp_email_header,
+                                              self.smtp_send_interval,
+                                              self.dataPersistent)
             self.email_service.start_email_service()
             self.email_service.send_message('Spider 启动完毕')
 
@@ -203,14 +214,15 @@ class SpiderCore:
 
         # 读取 Processor 模块配置
         self.process_thread_num = int(config.get(section, 'processThreadNum'))
+        self.is_parser_following_list = True if int(config.get(section, 'isParserFollowingList')) == 1 else False
+        self.is_parser_follower_list = True if int(config.get(section, 'isParserFollowerList')) == 1 else False
 
         # 读取 Scheduler 模块配置
         self.url_rate = int(config.get(section, 'urlRate'))
 
         # 读取 DataPersistent 模块配置
         self.persistent_cache_size = int(config.get(section, 'persistentCacheSize'))
-        self.is_parser_following_list = True if int(config.get(section, 'isParserFollowingList')) == 1 else False
-        self.is_parser_follower_list = True if int(config.get(section, 'isParserFollowerList')) == 1 else False
+        self.follow_relation_persistent_cache_size = int(config.get(section, 'followRelationPersistentCacheSize'))
 
         # 读取邮件服务配置
         self.is_email_service_enable = True if int(config.get(section, 'isEmailServiceEnable')) == 1 else False
@@ -237,9 +249,6 @@ class SpiderCore:
 
         # 读取知乎账户配置
         self.is_login_by_cookie = True if int(config.get(section, 'isLoginByCookie')) == 1 else False
-        self.q_c1 = config.get(section, 'q_c1')
-        self.r_cap_id = config.get(section, 'r_cap_id')
-        self.cap_id = config.get(section, 'cap_id')
         self.z_c0 = config.get(section, 'z_c0')
         self.login_token = config.get(section, 'loginToken')
         self.password = config.get(section, 'password')

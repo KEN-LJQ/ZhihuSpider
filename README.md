@@ -8,7 +8,7 @@
 
 * 使用多线程爬取，并可以自行配置使用的线程数目
 * 使用Redis作为任务队列
-* 使用高匿代理IP进行数据的爬取，每一个线程独立一个代理IP，并且失效后会重新分配，避免频繁访问导致本机 IP 被封
+* 使用高匿代理IP进行数据的爬取，并且失效后会重新分配新的可用代理，避免频繁访问导致本机 IP 被封
 * 可以启用邮件定时通知功能
 
 
@@ -59,7 +59,7 @@
   ```
   https://www.zhihu.com/people/excited-vczh/pins
   ```
-  认为用户详细信息仅仅在加载用户信息页时已经在后端进行渲染一同加载显示，数据放在`id`为`data`的`<div>`标签中的`data-state`属性，目前没有找到可以直接提取数据的接口，所以只能够选择一个数据量较少的页面整个爬取
+  个人认为用户详细信息仅仅在加载用户信息页时已经在后端进行渲染一同载入，数据放在`id`为`data`的`<div>`标签中的`data-state`属性，目前没有找到可以直接提取数据的接口，所以只能够选择一个数据量较少的页面整个爬取
 
 * 用户正在关注列表信息：
 
@@ -170,9 +170,12 @@
 
    2. 配置登陆认证信息。以下两种登陆方式
 
-      1. Cookie登陆方式。首先使用PC浏览器手动登陆知乎账号，然后从浏览器中将登陆成功后的Cookie配置到爬虫配置文件中。配置的cookie包括：`q_c1`, `r_cap_id`,`cap_id`, `z_c0`。
+      1. Cookie登陆方式。首先使用PC浏览器手动登陆知乎账号，然后从浏览器中将登陆成功后的Cookie配置到爬虫配置文件中。配置的cookie包括：`z_c0`。(如何从浏览器获取Cookie不详述)
 
-      ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-29/spider-1.PNG)
+      ```
+      # Cookie 登陆方式配置
+      z_c0 = XXX
+      ```
 
       2. 普通方式。（当前不可用）配置知乎账户的账号和密码，最好不要使用自己的主账号（目前知乎的邮箱登陆和手机号码登陆方式均需要输入普通验证码或选择倒转文字验证码， 还没有解决）
 
@@ -190,7 +193,7 @@
 
 10. 输入`startup.py`运行程序
 
- ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
+    		![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
 
  需要注意的是，CMD的字符集需要设置为utf8，否则可能会出现问题
 
@@ -214,19 +217,19 @@
 # 是否启用代理服务(1代表是，0代表否)
 isProxyServiceEnable = 1
 # session pool 的大小
-sessionPoolSize = 25
+sessionPoolSize = 20
 # 下载线程数量
-downloadThreadNum = 10
+downloadThreadNum = 5
 # 网络连接错误重试次数
 networkRetryTimes = 3
 # 网络连接超时（单位：秒）
 connectTimeout = 30
 # 下载间隔
-downloadInterval = 5
+downloadInterval = 6
 
 # 数据处理配置
 # 数据处理线程数量
-processThreadNum = 3
+processThreadNum = 2
 # 是否解析following列表（通过用户的正在关注列表获取下一批需要分析的token）
 isParserFollowingList = 1
 # 是否解析follower列表（通过用户的关注者列表获取下一批需要分析的token）
@@ -237,12 +240,14 @@ isParserFollowerList = 0
 urlRate = 8
 
 # 数据持久化配置
-# 数据库写缓存大小（记录条数）
+# 用户信息数据库写缓存大小（记录条数）
 persistentCacheSize = 100
+# 用户关注关系数据库写缓存大小
+followRelationPersistentCacheSize = 500
 
 # 邮件服务配置
 # 是否启用邮件通知(1代表是，0代表否)
-isEmailServiceEnable = 1
+isEmailServiceEnable = 0
 # SMTP邮件服务器域名
 smtpServerHost = smtp.mxhichina.com
 # SMTP邮件服务器端口
@@ -256,7 +261,7 @@ smtpToAddr = ljq1120799726@outlook.com
 # 邮件标题
 smtpEmailHeader = ZhiZhuSpiderNotification
 # 邮件发送间隔(单位：秒)
-smtpSendInterval = 14400
+smtpSendInterval = 3600
 
 # Redis 数据库配置
 redisHost = localhost
@@ -268,11 +273,16 @@ redisPassword = XXX
 mysqlHost = localhost
 mysqlUsername = root
 mysqlPassword = XXX
-mysqlDatabase = spider_test
+mysqlDatabase = spider_user
 mysqlCharset = utf8
 
-# 知乎账号配置
-loginToken = handsome@ken-ljq.xyz
+# 知乎登陆配置
+# 是否使用Cookie登陆
+isLoginByCookie = 1
+# Cookie 登陆方式配置
+z_c0 = XXX
+# 普通登陆方式配置
+loginToken = XXX
 password = XXX
 
 # 初始token（如果有多个初始token， 使用‘,’分隔）
@@ -316,6 +326,4 @@ proxyCore_proxyValidateThreadNum = 5
 ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-10.PNG)
 
 
-
-## 其他待续
 

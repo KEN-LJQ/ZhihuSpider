@@ -39,6 +39,12 @@ USER_QUESTION_COUNT = 'questionCount'
 # 用户获得赞同的数目
 USER_VOTE_UP_COUNT = 'voteupCount'
 
+# 关注关系字段
+# 关注者
+FOLLOW_FROM = 'followFrom'
+# 被关注者
+FOLLOW_TO = 'followTo'
+
 
 # 下载数据处理器
 class Processor:
@@ -71,7 +77,7 @@ class Processor:
             self.processor_list.append(process_thread)
 
         if log.isEnabledFor(logging.INFO):
-            log.info('Processor 初始化完毕')
+            log.info('Processor 模块初始化完毕')
 
     # 载入初始 token
     def load_init_data(self, token_list):
@@ -85,17 +91,16 @@ class Processor:
             del url_info
 
         if log.isEnabledFor(logging.INFO):
-            log.info('初始Token载入完毕')
+            log.info('初始用户Token载入完毕')
 
     # 启动数据处理器
     def start_processor(self):
-
-        if log.isEnabledFor(logging.INFO):
-            log.info('Processor 启动')
-
         # 启动处理线程
         for process_thread in self.processor_list:
             process_thread.start()
+
+        if log.isEnabledFor(logging.INFO):
+            log.info('Processor 模块启动成功')
 
     # 异常检查
     def check_and_restart(self):
@@ -126,7 +131,7 @@ str4 = '&limit='
 class ProcessThread(threading.Thread):
     __slots__ = ('thread_id', 'thread_status', 'redis_connection', 'token_filter', 'response_buffer',
                  'user_info_url_queue', 'follow_info_url_queue', 'persistent_cache', 'is_parser_following_list',
-                 'is_parser_follower_list')
+                 'is_parser_follower_list', 'follow_relation_persistent_cache')
 
     def __init__(self, thread_id, redis_connection, token_filter, response_buffer, is_parser_following_list,
                  is_parser_follower_list):
@@ -151,12 +156,14 @@ class ProcessThread(threading.Thread):
         self.user_info_url_queue = 'userInfoURLQueue'
         # follower & following list url 队列名称
         self.follow_info_url_queue = 'followInfoURLQueue'
-        # 数据持久化缓存队列名称
+        # 用户信息数据数据持久化缓存队列名称
         self.persistent_cache = 'persistentCache'
+        # 关注关系持久化缓存队列名称
+        self.follow_relation_persistent_cache = 'followRelationPersistentCache'
 
     def run(self):
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug('数据处理线程' + self.thread_id + '启动')
+        if log.isEnabledFor(logging.INFO):
+            log.info('数据处理线程' + self.thread_id + '启动')
 
         try:
             while True:
@@ -181,7 +188,7 @@ class ProcessThread(threading.Thread):
             if log.isEnabledFor(logging.ERROR):
                 log.exception(e)
 
-    # 解析用户信息
+    # 解析用户信息(生成的Follow URL Info内容[info, url, token, followingList/followerList])
     def parse_user_info(self, response_info):
         # 获取ResponseInfo中的信息
         data = response_info[1]
@@ -348,7 +355,7 @@ class ProcessThread(threading.Thread):
             log.info('成功获取一个用户的详细信息')
         self.redis_connection.rpush(self.persistent_cache, user_info_entities)
 
-    # 解析follower & following 信息
+    # 解析follower & following 信息(生成的User URLInfo内容格式[list, url, token])
     def parse_follow_info(self, response_info):
         # 获取ResponseInfo中的信息
         data = response_info[1]
@@ -384,9 +391,20 @@ class ProcessThread(threading.Thread):
             url_info = ['info', self.generate_user_info_url(token), token]
             self.redis_connection.rpush(self.user_info_url_queue, url_info)
 
-        # 可配置提取用户的关注关系
-        # user_token = response_info[2]
-        # isFollowingList = response_info[3]
+        # 提取用户的关注关系(即 following)
+        # (返回的Response内容[info, data, token, followingList/followerList])
+        # 关注列表类型
+        follow_list_type = response_info[3]
+        # 用户Token
+        token = response_info[2]
+        if follow_list_type == 'followingList':
+            pipe = self.redis_connection.pipeline()
+            for following_token in follow_list_token:
+                # 封装关注关系
+                follow_relation = {FOLLOW_FROM: token,
+                                   FOLLOW_TO: following_token}
+                pipe.rpush(self.follow_relation_persistent_cache, follow_relation)
+            pipe.execute()
 
     # 生成user info url
     @staticmethod

@@ -43,7 +43,7 @@ class EmailService:
         self.email_service_thread.start()
 
         if log.isEnabledFor(logging.INFO):
-            log.info('EmailService 模块启动')
+            log.info('EmailService 模块启动成功')
 
     def check_and_restart(self):
         if self.email_service_thread.thread_status == 'error':
