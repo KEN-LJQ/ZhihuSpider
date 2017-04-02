@@ -29,6 +29,7 @@ class SpiderCore:
         self.process_thread_num = 2
         self.is_parser_following_list = True
         self.is_parser_follower_list = False
+        self.is_parser_follow_relation = False
 
         # Scheduler 模块配置
         self.url_rate = 8
@@ -161,6 +162,7 @@ class SpiderCore:
         self.processor = Processor(self.process_thread_num,
                                    self.is_parser_following_list,
                                    self.is_parser_follower_list,
+                                   self.is_parser_follow_relation,
                                    self.redis_connection,
                                    self.response_buffer)
         self.processor.start_processor()
@@ -216,6 +218,7 @@ class SpiderCore:
         self.process_thread_num = int(config.get(section, 'processThreadNum'))
         self.is_parser_following_list = True if int(config.get(section, 'isParserFollowingList')) == 1 else False
         self.is_parser_follower_list = True if int(config.get(section, 'isParserFollowerList')) == 1 else False
+        self.is_parser_follow_relation = True if int(config.get(section, 'isParserFollowRelation')) == 1 else False
 
         # 读取 Scheduler 模块配置
         self.url_rate = int(config.get(section, 'urlRate'))

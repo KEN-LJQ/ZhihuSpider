@@ -49,10 +49,10 @@ FOLLOW_TO = 'followTo'
 # 下载数据处理器
 class Processor:
     __slots__ = ('process_thread_num', 'redis_connection', 'token_filter', 'response_buffer',
-                 'is_parser_following_list', 'is_parser_follower_list', 'processor_list')
+                 'is_parser_following_list', 'is_parser_follower_list', 'processor_list', 'is_parser_follow_relation')
 
     # 初始化
-    def __init__(self, process_thread_num, is_parser_following_list, is_parser_follower_list,
+    def __init__(self, process_thread_num, is_parser_following_list, is_parser_follower_list, is_parser_follow_relation,
                  redis_connection, response_buffer):
         # 设置数据处理器数量
         self.process_thread_num = process_thread_num
@@ -67,13 +67,15 @@ class Processor:
         self.is_parser_following_list = is_parser_following_list
         # 是否解析关注者列表
         self.is_parser_follower_list = is_parser_follower_list
+        # 是否解析关注关系
+        self.is_parser_follow_relation = is_parser_follow_relation
 
         # 创建处理器
         self.processor_list = []
         for i in range(process_thread_num):
             process_thread = ProcessThread('thread' + str(i), self.redis_connection, self.token_filter,
                                            self.response_buffer, self.is_parser_following_list,
-                                           self.is_parser_follower_list)
+                                           self.is_parser_follower_list, self.is_parser_follow_relation)
             self.processor_list.append(process_thread)
 
         if log.isEnabledFor(logging.INFO):
@@ -111,7 +113,7 @@ class Processor:
                 del process_thread
                 new_thread = ProcessThread(thread_id, self.redis_connection, self.token_filter,
                                            self.response_buffer, self.is_parser_following_list,
-                                           self.is_parser_follower_list)
+                                           self.is_parser_follower_list, self.is_parser_follow_relation)
                 self.processor_list.append(new_thread)
                 new_thread.start()
 
@@ -131,10 +133,10 @@ str4 = '&limit='
 class ProcessThread(threading.Thread):
     __slots__ = ('thread_id', 'thread_status', 'redis_connection', 'token_filter', 'response_buffer',
                  'user_info_url_queue', 'follow_info_url_queue', 'persistent_cache', 'is_parser_following_list',
-                 'is_parser_follower_list', 'follow_relation_persistent_cache')
+                 'is_parser_follower_list', 'follow_relation_persistent_cache', 'is_parser_follow_relation')
 
     def __init__(self, thread_id, redis_connection, token_filter, response_buffer, is_parser_following_list,
-                 is_parser_follower_list):
+                 is_parser_follower_list, is_parser_follow_relation):
         threading.Thread.__init__(self)
         # 设置线程名称
         self.thread_id = thread_id
@@ -149,6 +151,8 @@ class ProcessThread(threading.Thread):
         self.is_parser_following_list = is_parser_following_list
         # 是否解析关注者列表
         self.is_parser_follower_list = is_parser_follower_list
+        # 是否解析关注列表
+        self.is_parser_follow_relation = is_parser_follow_relation
 
         # 下载数据队列
         self.response_buffer = response_buffer
@@ -188,7 +192,7 @@ class ProcessThread(threading.Thread):
             if log.isEnabledFor(logging.ERROR):
                 log.exception(e)
 
-    # 解析用户信息(生成的Follow URL Info内容[info, url, token, followingList/followerList])
+    # 解析用户信息(生成的Follow URL Info内容[list, url, token, followingList/followerList])
     def parse_user_info(self, response_info):
         # 获取ResponseInfo中的信息
         data = response_info[1]
@@ -323,6 +327,13 @@ class ProcessThread(threading.Thread):
         if user_info_entities is None:
             return
 
+        # 再次检查用户是否已经添加,若已经添加则不再继续
+        if self.token_filter.check_token(token) is True:
+            return
+
+        # 标记提取的用户信息
+        self.token_filter.mark_token(token)
+
         # 生成 Following List URL
         if self.is_parser_following_list is True:
             pipe = self.redis_connection.pipeline()
@@ -349,13 +360,12 @@ class ProcessThread(threading.Thread):
                     pipe.rpush(self.follow_info_url_queue, url_info)
                 pipe.execute()
 
-        # 标记并保存提取到的用户信息
-        self.token_filter.mark_token(token)
+        # 保存提取到的用户信息
         if log.isEnabledFor(logging.DEBUG):
             log.info('成功获取一个用户的详细信息')
         self.redis_connection.rpush(self.persistent_cache, user_info_entities)
 
-    # 解析follower & following 信息(生成的User URLInfo内容格式[list, url, token])
+    # 解析follower & following 信息(生成的User URLInfo内容格式[info, url, token])
     def parse_follow_info(self, response_info):
         # 获取ResponseInfo中的信息
         data = response_info[1]
@@ -393,18 +403,19 @@ class ProcessThread(threading.Thread):
 
         # 提取用户的关注关系(即 following)
         # (返回的Response内容[info, data, token, followingList/followerList])
-        # 关注列表类型
-        follow_list_type = response_info[3]
-        # 用户Token
-        token = response_info[2]
-        if follow_list_type == 'followingList':
-            pipe = self.redis_connection.pipeline()
-            for following_token in follow_list_token:
-                # 封装关注关系
-                follow_relation = {FOLLOW_FROM: token,
-                                   FOLLOW_TO: following_token}
-                pipe.rpush(self.follow_relation_persistent_cache, follow_relation)
-            pipe.execute()
+        if self.is_parser_follow_relation is True:
+            # 关注列表类型
+            follow_list_type = response_info[3]
+            # 用户Token
+            token = response_info[2]
+            if follow_list_type == 'followingList':
+                pipe = self.redis_connection.pipeline()
+                for following_token in follow_list_token:
+                    # 封装关注关系
+                    follow_relation = {FOLLOW_FROM: token,
+                                       FOLLOW_TO: following_token}
+                    pipe.rpush(self.follow_relation_persistent_cache, follow_relation)
+                pipe.execute()
 
     # 生成user info url
     @staticmethod

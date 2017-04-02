@@ -6,6 +6,7 @@
 
 ## 特点
 
+* 除了爬取用户信息外，还可以选择爬取用户之间的关注关系
 * 使用多线程爬取，并可以自行配置使用的线程数目
 * 使用Redis作为任务队列
 * 使用高匿代理IP进行数据的爬取，并且失效后会重新分配新的可用代理，避免频繁访问导致本机 IP 被封
@@ -193,7 +194,7 @@
 
 10. 输入`startup.py`运行程序
 
-    		![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
+     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
 
  需要注意的是，CMD的字符集需要设置为utf8，否则可能会出现问题
 
