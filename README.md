@@ -118,11 +118,9 @@
 
 ## 如何运行
 
-1. 安装指定版本的 Python、数据库、以及必须的第三方库
-
-2. 执行`db.sql`文件，创建使用到的数据库以及表
-
-3. 配置程序中的数据库配置
+0. 安装指定版本的 Python
+1. 执行 `pip3 install -r requirements.txt` 命令安装数据库、以及必须的第三方库 
+2. 配置程序中的数据库配置
 
    1. 打开`SpiderCoreConfig.conf` 文件，修改MySQL的配置
 
@@ -131,7 +129,8 @@
    2. 在同一个文件下，修改Redis的配置、
 
       ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-2.PNG)
-
+      
+3. 执行`db.sql`文件，创建使用到的数据库以及表
 4. 添加若干个初始的用户 token，程序运行后将会以这个用户开始搜索
 
    1. 修改`SpiderCoreConfig.conf`文件中里面的的`startToken` 变量的值为初始的用户token（可以设置多个）
