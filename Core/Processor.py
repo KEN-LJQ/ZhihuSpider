@@ -392,6 +392,7 @@ class ProcessThread(threading.Thread):
         except Exception as e:
             if log.isEnabledFor(logging.ERROR):
                 log.error('Follower & Following List 数据解析错误')
+            if log.isEnabledFor(logging.DEBUG):
                 log.exception(e)
             return
 

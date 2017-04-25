@@ -1,6 +1,7 @@
 import requests
 import re
 import logging
+import time
 from Core.Logger import log
 
 # 代理 IP 验证网站
@@ -10,7 +11,7 @@ header = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image
           'Accept-Encoding': 'gzip, deflate, sdch',
           'Accept-Language': 'zh-CN,zh;q=0.8',
           'Cache-Control': 'max-age=0',
-          'Host': 'icanhazip.com',
+          'Host': 'www.icanhazip.com',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) '
                         'Chrome/56.0.2924.87 Safari/537.36'}
 
@@ -37,12 +38,10 @@ class DataValidateModule:
         proxy = {proxy_protocol: proxy_ip + ':' + proxy_port}
 
         # 使用代理进行连接
-        self.session.headers = header
-        self.session.proxies = proxy
         retry_time = 0
         while retry_time < NETWORK_RECONNECT_TIMES:
             try:
-                response = self.session.get(url, timeout=CONNECT_TIMEOUT)
+                response = requests.get(url, timeout=CONNECT_TIMEOUT, headers=header, proxies=proxy)
 
                 # 解析返回的当前使用的IP并判断是否有效
                 match_list = re.findall(r'[0-9]+(?:\.[0-9]+){3}', response.text)
@@ -54,6 +53,7 @@ class DataValidateModule:
                         return True
                 else:
                     retry_time += 1
+                    time.sleep(1)
             except Exception:
                 retry_time += 1
         return False

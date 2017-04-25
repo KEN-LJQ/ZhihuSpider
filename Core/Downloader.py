@@ -23,7 +23,7 @@ requestHeader = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.
 # SessionPool 管理器
 class SessionManager:
     __slots__ = ('session_pool_size', 'created_session_num', 'available_session_num', 'is_proxy_service_enable',
-                 'account_manager', 'session_pool', 'proxy_service')
+                 'account_manager', 'session_pool', 'proxy_service', 'available_session_lock', 'created_session_lock')
 
     # 初始化
     def __init__(self, session_pool_size, account_manager, is_proxy_service_enable):
@@ -37,6 +37,11 @@ class SessionManager:
         self.is_proxy_service_enable = is_proxy_service_enable
         # 账号认证管理器
         self.account_manager = account_manager
+
+        # available session num 锁
+        self.available_session_lock = threading.Lock()
+        # created session num 锁
+        self.created_session_lock = threading.Lock()
 
         # 创建 session pool
         self.session_pool = queue.Queue(session_pool_size)
@@ -55,12 +60,17 @@ class SessionManager:
         port = proxy_info['port']
         protocol = proxy_info['protocol'].lower()
         proxy = {protocol: ip + ':' + port}
+
         # 创建session
         session = requests.session()
         session.headers = requestHeader
         session.cookies.update(self.account_manager.get_auth_token())
         session.proxies = proxy
-        return session
+
+        # 将 session 放入到池中
+        self.session_pool.put(session)
+        self.created_session_num_change(1)
+        self.available_session_num_change(1)
 
     # 创建不含代理信息的 session
     def create_session(self):
@@ -68,40 +78,31 @@ class SessionManager:
         session = requests.session()
         session.cookies.update(self.account_manager.get_auth_token())
         session.headers = requestHeader
-        print('创建成功')
-        return session
+
+        # 将 session 放入池中
+        self.session_pool.put(session)
+        self.created_session_num_change(1)
+        self.available_session_num_change(1)
 
     # 获取一个session连接
     def get_session_connection(self):
-        if self.available_session_num > 0:
-            # 若当前池中有可用的session则直接获取
-            return self.session_pool.get()
-        elif self.created_session_num < self.session_pool_size:
-            # 若当前池中没有可用的session，但仍允许创建新的session，则创建新的session返回
-            if self.is_proxy_service_enable is True:
-                session = self.create_session_proxy(self.proxy_service.get_proxy())
-            else:
-                session = self.create_session()
-            self.created_session_num += 1
-            return session
-        else:
-            # 否则等待获取
-            return self.session_pool.get()
 
-    # 用于阻塞数据下载线程启动直至获取代理
-    def init_get(self):
-        if self.is_proxy_service_enable is True:
-            session = self.create_session_proxy(self.proxy_service.get_proxy())
-        else:
-            session = self.create_session()
-        self.created_session_num += 1
-        self.session_pool.put(session)
-        self.available_session_num += 1
+        # 辅助创建 session pool 中的 session
+        if self.available_session_num <= 0 and self.created_session_num < self.session_pool_size:
+            if self.is_proxy_service_enable is True:
+                self.create_session_proxy(self.proxy_service.get_proxy())
+            else:
+                self.create_session()
+
+        # 从 session pool 中获取
+        session = self.session_pool.get()
+        self.available_session_num_change(-1)
+        return session
 
     # 归还一个 session 连接
     def return_session_connection(self, session_connection):
         self.session_pool.put(session_connection)
-        self.available_session_num += 1
+        self.available_session_num_change(1)
 
     # 归还并更换 session 的代理
     def return_and_switch_proxy(self, session_connection):
@@ -115,6 +116,18 @@ class SessionManager:
             session_connection.proxies = proxy
         # 归还
         self.return_session_connection(session_connection)
+
+    # 修改 available_session_num 的值
+    def available_session_num_change(self, num):
+        self.available_session_lock.acquire()
+        self.available_session_num += num
+        self.available_session_lock.release()
+
+    # 修改 available_session_num 的值
+    def created_session_num_change(self, num):
+        self.created_session_lock.acquire()
+        self.created_session_num += num
+        self.created_session_lock.release()
 
 
 # 管理下载线程
@@ -210,9 +223,6 @@ class DownloadThread(threading.Thread):
         if log.isEnabledFor(logging.INFO):
             log.info('数据下载线程' + self.thread_id + '启动')
 
-        # 初次启动，阻塞至获取足够的代理
-        self.session_manager.init_get()
-
         # 保存上一次未下载的url info
         previous_url_info = None
         while True:
@@ -259,7 +269,6 @@ class DownloadThread(threading.Thread):
                         break
                     elif response.status_code == 404 or response.status_code == 410:
                         previous_url_info = None
-                        del url_info
                         break
                     else:
                         if log.isEnabledFor(logging.ERROR):

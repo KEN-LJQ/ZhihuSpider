@@ -133,7 +133,9 @@ class SpiderCore:
                                               self.password,
                                               self.is_login_by_cookie,
                                               self.z_c0)
-        self.account_manager.login()
+        is_login = self.account_manager.login()
+        if not is_login:
+            return
 
         # 启动Downloader
         self.downloader = Downloader(self.redis_connection,
