@@ -129,7 +129,7 @@
    2. 在同一个文件下，修改Redis的配置、
 
       ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-22/spider-2.PNG)
-      
+
 3. 执行`db.sql`文件，创建使用到的数据库以及表
 4. 添加若干个初始的用户 token，程序运行后将会以这个用户开始搜索
 
@@ -193,7 +193,7 @@
 
 10. 输入`startup.py`运行程序
 
-     ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
+    ![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-2-15/%E7%9F%A5%E4%B9%8E%E7%88%AC%E8%99%AB-%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A85.png)
 
  需要注意的是，CMD的字符集需要设置为utf8，否则可能会出现问题
 
@@ -319,11 +319,11 @@ proxyCore_proxyValidateThreadNum = 5
 
 
 
-## 简单的分析数据
+## 数据分析
 
-![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-9.PNG)
+[简书 - 知乎用户信息分析](http://www.jianshu.com/p/962bc581e03a)
 
-![](https://raw.githubusercontent.com/KEN-LJQ/MarkdownPics/master/Resource/2017-3-10/zhihuSpider-10.PNG)
+
 
 
 
